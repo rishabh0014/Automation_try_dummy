@@ -6,6 +6,12 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from rank_bm25 import BM25Okapi
 
+def drain_template(msg):
+    msg = msg.lower()
+    msg = re.sub(r'0x[0-9a-fA-F]+', '<*>', msg)
+    msg = re.sub(r'\d+', '<*>', msg)
+    return msg
+
 df = pd.read_excel("data/error_dataset_with_testcases_2500.xlsx")
 
 errors = df["error_message"].tolist()
@@ -27,7 +33,7 @@ processed = []
 
 for err, tc in zip(errors, testcases):
 
-    template = extract_template(err)
+    template = drain_template(err)
 
     processed.append(tc + " " + template)
 

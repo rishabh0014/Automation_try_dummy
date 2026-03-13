@@ -6,6 +6,16 @@ import re
 from sentence_transformers import SentenceTransformer
 from pydantic import BaseModel
 
+
+def drain_template(msg):
+
+    msg = msg.lower()
+
+    msg = re.sub(r'0x[0-9a-fA-F]+', '<*>', msg)
+    msg = re.sub(r'\d+', '<*>', msg)
+
+    return msg
+
 app = FastAPI()
 
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -36,7 +46,9 @@ def preprocess(msg):
 @app.post("/search_error")
 def search_error(query: Query):
 
-    processed = query.testcase + " " + preprocess(query.error)
+    template = drain_template(query.error)
+
+    processed = query.testcase + " " + template
 
     embedding = model.encode([processed]).astype("float32")
 
