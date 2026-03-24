@@ -1,0 +1,125 @@
+import os
+import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
+
+class ExcelProcessor:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.withdraw()
+
+    # -----------------------------
+    # FILE SELECTION METHODS
+    # -----------------------------
+    def select_excel_file(self):
+        """Let user pick an Excel file from system"""
+        file_path = filedialog.askopenfilename(
+            title="Select Excel File",
+            filetypes=[("Excel files", "*.xlsx *.xls")]
+        )
+        return file_path
+
+    def get_open_excel_files(self):
+        """
+        Get currently open Excel files (Windows only using xlwings)
+        """
+        try:
+            import xlwings as xw
+            apps = xw.apps
+            open_files = []
+
+            for app in apps:
+                for book in app.books:
+                    if book.fullname:
+                        open_files.append(book.fullname)
+
+            return open_files
+        except ImportError:
+            messagebox.showerror("Error", "xlwings not installed. Run: pip install xlwings")
+            return []
+
+    def choose_from_open_files(self):
+        files = self.get_open_excel_files()
+        if not files:
+            messagebox.showinfo("Info", "No open Excel files found.")
+            return None
+
+        print("\nOpen Excel Files:")
+        for i, f in enumerate(files):
+            print(f"{i + 1}. {f}")
+
+        choice = int(input("Select file number: ")) - 1
+        return files[choice] if 0 <= choice < len(files) else None
+
+    # -----------------------------
+    # DATA PROCESSING
+    # -----------------------------
+    def read_required_columns(self, file_path):
+        """Read columns H, J, K, L"""
+        try:
+            df = pd.read_excel(file_path, engine='openpyxl')
+
+            # Columns are 0-indexed → H=7, J=9, K=10, L=11
+            selected_df = df.iloc[:, [7, 9, 10, 11]]
+
+            return selected_df
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read file:\n{e}")
+            return None
+
+    # -----------------------------
+    # SAVE FILE
+    # -----------------------------
+    def save_to_txt(self, df, original_file):
+        """Save dataframe as CSV in .txt file"""
+        default_name = os.path.splitext(os.path.basename(original_file))[0] + ".txt"
+
+        save_path = filedialog.asksaveasfilename(
+            title="Save TXT File",
+            defaultextension=".txt",
+            initialfile=default_name,
+            filetypes=[("Text files", "*.txt")]
+        )
+
+        if not save_path:
+            return
+
+        try:
+            df.to_csv(save_path, index=False)
+            messagebox.showinfo("Success", f"File saved at:\n{save_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save file:\n{e}")
+
+    # -----------------------------
+    # MAIN FLOW
+    # -----------------------------
+    def run(self):
+        print("Choose option:")
+        print("1. Select from OPEN Excel files")
+        print("2. Select from SAVED files")
+
+        choice = input("Enter choice (1/2): ").strip()
+
+        if choice == "1":
+            file_path = self.choose_from_open_files()
+        elif choice == "2":
+            file_path = self.select_excel_file()
+        else:
+            print("Invalid choice")
+            return
+
+        if not file_path:
+            print("No file selected")
+            return
+
+        df = self.read_required_columns(file_path)
+        if df is not None:
+            self.save_to_txt(df, file_path)
+
+
+# -----------------------------
+# ENTRY POINT
+# -----------------------------
+if __name__ == "__main__":
+    processor = ExcelProcessor()
+    processor.run()
