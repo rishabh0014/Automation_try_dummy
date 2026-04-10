@@ -1,88 +1,76 @@
-import requests
-
-OLLAMA_URL = "http://localhost:11434/api/embeddings"
-MODEL_NAME = "nomic-embed-text"  # change if needed
-
-
-def get_embedding(text: str):
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": text
-    }
-
-    response = requests.post(OLLAMA_URL, json=payload)
-
-    if response.status_code != 200:
-        raise Exception(f"Ollama error: {response.text}")
-
-    return response.json()["embedding"]
-
-
-
-def build_embedding_text(issue, description=None):
-    parts = []
-
-    if issue.get("testcase"):
-        parts.append(f"Testcase: {issue['testcase']}")
-
-    if issue.get("error_message"):
-        parts.append(f"Error: {issue['error_message']}")
-
-    if description:
-        parts.append(f"Description: {description}")
-
-    return "\n".join(parts)
-
-
-
-
-import json
 import numpy as np
+import faiss
 import os
 
-from app.embedder import get_embedding
-from app.utils import build_embedding_text
-
-INPUT_FILE = "data/processed/issues.json"
-OUTPUT_FILE = "models/embeddings.npy"
-MAPPING_FILE = "models/mapping.json"
+EMBEDDINGS_FILE = "models/embeddings.npy"
+INDEX_FILE = "models/faiss.index"
 
 
 def main():
-    print("📥 Loading issues...")
+    print("📥 Loading embeddings...")
 
-    with open(INPUT_FILE, "r") as f:
-        issues = json.load(f)
+    embeddings = np.load(EMBEDDINGS_FILE)
 
-    embeddings = []
-    mapping = []
+    dim = embeddings.shape[1]
+    print(f"📐 Embedding dimension: {dim}")
 
-    for idx, issue in enumerate(issues):
-        try:
-            text = build_embedding_text(issue)
+    # Normalize for cosine similarity
+    faiss.normalize_L2(embeddings)
 
-            emb = get_embedding(text)
+    # Create index
+    index = faiss.IndexFlatIP(dim)  # Inner Product = cosine after normalize
 
-            embeddings.append(emb)
-            mapping.append(issue)
-
-            if idx % 50 == 0:
-                print(f"Processed {idx} issues...")
-
-        except Exception as e:
-            print(f"⚠️ Skipping issue {issue.get('issue_id')}: {e}")
-
-    embeddings = np.array(embeddings)
+    print("⚙️ Building FAISS index...")
+    index.add(embeddings)
 
     os.makedirs("models", exist_ok=True)
+    faiss.write_index(index, INDEX_FILE)
 
-    np.save(OUTPUT_FILE, embeddings)
-
-    with open(MAPPING_FILE, "w") as f:
-        json.dump(mapping, f)
-
-    print("✅ Embeddings saved!")
+    print("✅ FAISS index saved!")
 
 
 if __name__ == "__main__":
     main()
+
+
+
+import faiss
+import numpy as np
+import json
+
+from app.embedder import get_embedding
+from app.utils import build_embedding_text
+
+INDEX_FILE = "models/faiss.index"
+MAPPING_FILE = "models/mapping.json"
+
+# Load once (important for performance)
+index = faiss.read_index(INDEX_FILE)
+
+with open(MAPPING_FILE, "r") as f:
+    mapping = json.load(f)
+
+
+def search_similar(issue, top_k=5):
+    text = build_embedding_text(issue)
+
+    query_embedding = get_embedding(text)
+    query_embedding = np.array([query_embedding]).astype("float32")
+
+    # Normalize (same as index)
+    faiss.normalize_L2(query_embedding)
+
+    scores, indices = index.search(query_embedding, top_k)
+
+    results = []
+
+    for score, idx in zip(scores[0], indices[0]):
+        if idx == -1:
+            continue
+
+        result = mapping[idx]
+        result["score"] = float(score)
+
+        results.append(result)
+
+    return results
