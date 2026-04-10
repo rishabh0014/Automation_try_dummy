@@ -1,0 +1,55 @@
+import pandas as pd
+import os
+
+# ===== CONFIG =====
+INPUT_FILE = "data/raw/issues.xlsx"   # change path
+OUTPUT_FILE = "data/raw/issues.txt"
+
+# Map your actual column names here
+COLUMN_MAPPING = {
+    "issue_id": "Issue ID",
+    "testcase": "Testcase",
+    "error_message": "Error Message",
+    "description": "Description",
+    "analysis": "Analysis",
+    "status": "Status"
+}
+
+
+def clean_text(value):
+    if pd.isna(value):
+        return ""
+    # Remove newlines and extra spaces
+    return str(value).replace("\n", " ").strip()
+
+
+def format_issue(row):
+    return f"""---ISSUE_START---
+issue_id: {clean_text(row[COLUMN_MAPPING['issue_id']])}
+testcase: {clean_text(row[COLUMN_MAPPING['testcase']])}
+error_message: {clean_text(row[COLUMN_MAPPING['error_message']])}
+description: {clean_text(row[COLUMN_MAPPING['description']])}
+analysis: {clean_text(row[COLUMN_MAPPING['analysis']])}
+status: {clean_text(row[COLUMN_MAPPING['status']])}
+---ISSUE_END---
+"""
+
+
+def main():
+    print("📥 Reading Excel...")
+    df = pd.read_excel(INPUT_FILE)
+
+    print(f"🔢 Total rows: {len(df)}")
+
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        for _, row in df.iterrows():
+            issue_block = format_issue(row)
+            f.write(issue_block + "\n")
+
+    print(f"✅ TXT file generated at: {OUTPUT_FILE}")
+
+
+if __name__ == "__main__":
+    main()
