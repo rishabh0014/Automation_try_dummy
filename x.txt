@@ -1,80 +1,87 @@
-import os
-import json
+import requests
 
-INPUT_FILE = "data/raw/issues.txt"
-OUTPUT_FILE = "data/processed/issues.json"
+OLLAMA_URL = "http://localhost:11434/api/embeddings"
+MODEL_NAME = "nomic-embed-text"  # change if needed
 
 
-def parse_issue_block(block):
-    issue = {
-        "issue_id": "",
-        "testcase": "",
-        "error_message": "",
-        "analysis": "",
-        "status": "",
-        "ims_link": ""
+def get_embedding(text: str):
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": text
     }
 
-    lines = block.strip().split("\n")
+    response = requests.post(OLLAMA_URL, json=payload)
 
-    for line in lines:
-        if ":" not in line:
-            continue
+    if response.status_code != 200:
+        raise Exception(f"Ollama error: {response.text}")
 
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
-
-        if key in issue:
-            issue[key] = value
-
-    return issue
+    return response.json()["embedding"]
 
 
-def parse_txt_file():
-    with open(INPUT_FILE, "r", encoding="utf-8") as f:
-        content = f.read()
 
-    blocks = content.split("---ISSUE_START---")
-    issues = []
+def build_embedding_text(issue, description=None):
+    parts = []
 
-    for block in blocks:
-        if "---ISSUE_END---" not in block:
-            continue
+    if issue.get("testcase"):
+        parts.append(f"Testcase: {issue['testcase']}")
 
-        block_content = block.split("---ISSUE_END---")[0].strip()
+    if issue.get("error_message"):
+        parts.append(f"Error: {issue['error_message']}")
 
-        if not block_content:
-            continue
+    if description:
+        parts.append(f"Description: {description}")
 
-        try:
-            issue = parse_issue_block(block_content)
+    return "\n".join(parts)
 
-            # Minimal validation
-            if not issue["issue_id"]:
-                continue
 
-            issues.append(issue)
 
-        except Exception as e:
-            print(f"⚠️ Skipping malformed block: {e}")
 
-    return issues
+import json
+import numpy as np
+import os
+
+from app.embedder import get_embedding
+from app.utils import build_embedding_text
+
+INPUT_FILE = "data/processed/issues.json"
+OUTPUT_FILE = "models/embeddings.npy"
+MAPPING_FILE = "models/mapping.json"
 
 
 def main():
-    print("📥 Parsing TXT file...")
+    print("📥 Loading issues...")
 
-    issues = parse_txt_file()
+    with open(INPUT_FILE, "r") as f:
+        issues = json.load(f)
 
-    print(f"✅ Parsed {len(issues)} issues")
+    embeddings = []
+    mapping = []
 
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    for idx, issue in enumerate(issues):
+        try:
+            text = build_embedding_text(issue)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(issues, f, indent=2)
+            emb = get_embedding(text)
 
-    print(f"💾 Saved to {OUTPUT_FILE}")
+            embeddings.append(emb)
+            mapping.append(issue)
+
+            if idx % 50 == 0:
+                print(f"Processed {idx} issues...")
+
+        except Exception as e:
+            print(f"⚠️ Skipping issue {issue.get('issue_id')}: {e}")
+
+    embeddings = np.array(embeddings)
+
+    os.makedirs("models", exist_ok=True)
+
+    np.save(OUTPUT_FILE, embeddings)
+
+    with open(MAPPING_FILE, "w") as f:
+        json.dump(mapping, f)
+
+    print("✅ Embeddings saved!")
 
 
 if __name__ == "__main__":
