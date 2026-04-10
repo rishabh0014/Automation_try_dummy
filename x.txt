@@ -1,50 +1,65 @@
-import pandas as pd
+import xlwings as xw
 import os
 
 # ===== CONFIG =====
-INPUT_FILE = "data/raw/issues.xlsx"   # change path
-OUTPUT_FILE = "data/raw/issues.txt"
+INPUT_FILE = "issues.xlsx"   # your excel path
+SHEET_NAME = 0               # or sheet name
+OUTPUT_FILE = "issues.txt"
 
-# Map your actual column names here
+# Map column index (1-based index like Excel)
 COLUMN_MAPPING = {
-    "issue_id": "Issue ID",
-    "testcase": "Testcase",
-    "error_message": "Error Message",
-    "description": "Description",
-    "analysis": "Analysis",
-    "status": "Status"
+    "issue_id": 1,        # Column A
+    "testcase": 2,        # Column B
+    "error_message": 3,   # Column C
+    "description": 4,     # Column D
+    "analysis": 5,        # Column E
+    "status": 6           # Column F
 }
 
 
 def clean_text(value):
-    if pd.isna(value):
+    if value is None:
         return ""
-    # Remove newlines and extra spaces
     return str(value).replace("\n", " ").strip()
 
 
 def format_issue(row):
     return f"""---ISSUE_START---
-issue_id: {clean_text(row[COLUMN_MAPPING['issue_id']])}
-testcase: {clean_text(row[COLUMN_MAPPING['testcase']])}
-error_message: {clean_text(row[COLUMN_MAPPING['error_message']])}
-description: {clean_text(row[COLUMN_MAPPING['description']])}
-analysis: {clean_text(row[COLUMN_MAPPING['analysis']])}
-status: {clean_text(row[COLUMN_MAPPING['status']])}
+issue_id: {clean_text(row[COLUMN_MAPPING['issue_id'] - 1])}
+testcase: {clean_text(row[COLUMN_MAPPING['testcase'] - 1])}
+error_message: {clean_text(row[COLUMN_MAPPING['error_message'] - 1])}
+description: {clean_text(row[COLUMN_MAPPING['description'] - 1])}
+analysis: {clean_text(row[COLUMN_MAPPING['analysis'] - 1])}
+status: {clean_text(row[COLUMN_MAPPING['status'] - 1])}
 ---ISSUE_END---
 """
 
 
 def main():
-    print("📥 Reading Excel...")
-    df = pd.read_excel(INPUT_FILE)
+    print("📥 Opening Excel via xlwings...")
+    app = xw.App(visible=False)
 
-    print(f"🔢 Total rows: {len(df)}")
+    wb = app.books.open(INPUT_FILE)
+    sheet = wb.sheets[SHEET_NAME]
 
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    # Get used range
+    data = sheet.used_range.value
+
+    wb.close()
+    app.quit()
+
+    print(f"🔢 Total rows (including header): {len(data)}")
+
+    # Skip header (assuming first row is header)
+    rows = data[1:]
+
+    os.makedirs(os.path.dirname(OUTPUT_FILE) or ".", exist_ok=True)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for _, row in df.iterrows():
+        for row in rows:
+            if not row or all(cell is None for cell in row):
+                continue  # skip empty rows
+
             issue_block = format_issue(row)
             f.write(issue_block + "\n")
 
