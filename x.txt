@@ -1,37 +1,74 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from app.engine import process_issue
-
-app = FastAPI()
+import requests
+from app.config import JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD
+from app.jira_utils import extract_issue_id
 
 
-class IssueRequest(BaseModel):
-    testcase: str = None
-    error_message: str = None
-    ims_link: str = None
+def get_issue_description(ims_link: str):
+    issue_id = extract_issue_id(ims_link)
+
+    if not issue_id:
+        return None
+
+    url = f"{JIRA_BASE_URL}/rest/api/2/issue/{issue_id}"
+
+    response = requests.get(
+        url,
+        auth=(JIRA_USERNAME, JIRA_PASSWORD),
+        headers={"Accept": "application/json"}
+    )
+
+    if response.status_code != 200:
+        print(f"❌ Failed to fetch issue: {response.text}")
+        return None
+
+    data = response.json()
+
+    # JIRA stores description here
+    description = data.get("fields", {}).get("description")
+
+    return description
 
 
-@app.get("/")
-def health_check():
-    return {"status": "running"}
+def clean_description(desc):
+    if not desc:
+        return ""
+
+    # Case 1: Plain string
+    if isinstance(desc, str):
+        return desc
+
+    # Case 2: ADF format (JIRA JSON)
+    if isinstance(desc, dict):
+        return extract_text_from_adf(desc)
+
+    return ""
 
 
-@app.post("/analyze_issue")
-def analyze_issue(issue: IssueRequest):
-    issue_dict = issue.dict()
+def extract_text_from_adf(adf):
+    texts = []
 
-    result = process_issue(issue_dict)
+    def recurse(node):
+        if isinstance(node, dict):
+            if node.get("type") == "text":
+                texts.append(node.get("text", ""))
 
-    response = {
-        "decision": result["decision"],
-        "matched_issue": None,
-        "score": None,
-        "analysis": None
-    }
+            for child in node.get("content", []):
+                recurse(child)
 
-    if result["best_match"]:
-        response["matched_issue"] = result["best_match"].get("issue_id")
-        response["score"] = result["best_match"].get("score")
-        response["analysis"] = result["best_match"].get("analysis")
+        elif isinstance(node, list):
+            for item in node:
+                recurse(item)
 
-    return response
+    recurse(adf)
+    return " ".join(texts)
+
+from app.jira_client import get_issue_description, clean_description
+
+link = "https://ims.jira.samsungds.net/browser/PCIEJ-12106"
+
+desc = get_issue_description(link)
+
+cleaned = clean_description(desc)
+
+print("RAW:\n", desc)
+print("\nCLEANED:\n", cleaned)
