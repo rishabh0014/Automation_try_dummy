@@ -1,44 +1,37 @@
-def classify_result(results):
-    if not results:
-        return "NO_MATCH", None
-
-    top = results[0]
-    score = top["score"]
-
-    # 🔥 Tune these later
-    if score >= 0.90:
-        return "HIGH_CONFIDENCE", top
-    elif score >= 0.80:
-        return "MEDIUM_CONFIDENCE", top
-    else:
-        return "LOW_CONFIDENCE", None
-
-from app.search import search_similar
-from app.decision import classify_result
-
-
-def process_issue(issue):
-    results = search_similar(issue)
-
-    decision, best_match = classify_result(results)
-
-    return {
-        "decision": decision,
-        "best_match": best_match,
-        "top_results": results
-    }
-
+from fastapi import FastAPI
+from pydantic import BaseModel
 from app.engine import process_issue
 
-test_issue = {
-    "testcase": "PCIe test failure",
-    "error_message": "link training failed"
-}
+app = FastAPI()
 
-result = process_issue(test_issue)
 
-print("Decision:", result["decision"])
+class IssueRequest(BaseModel):
+    testcase: str = None
+    error_message: str = None
+    ims_link: str = None
 
-if result["best_match"]:
-    print("Matched Issue:", result["best_match"]["issue_id"])
-    print("Score:", result["best_match"]["score"])
+
+@app.get("/")
+def health_check():
+    return {"status": "running"}
+
+
+@app.post("/analyze_issue")
+def analyze_issue(issue: IssueRequest):
+    issue_dict = issue.dict()
+
+    result = process_issue(issue_dict)
+
+    response = {
+        "decision": result["decision"],
+        "matched_issue": None,
+        "score": None,
+        "analysis": None
+    }
+
+    if result["best_match"]:
+        response["matched_issue"] = result["best_match"].get("issue_id")
+        response["score"] = result["best_match"].get("score")
+        response["analysis"] = result["best_match"].get("analysis")
+
+    return response
