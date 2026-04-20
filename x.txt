@@ -1,337 +1,56 @@
-# 🔍 PCIeJ Issue Similarity System
-
-An internal AI-powered tool to automatically detect similar past issues for newly created PCIeJ issues and assist in faster debugging and analysis.
-
----
-
-## 🚀 Overview
-
-Whenever a new PCIeJ issue is created, this system:
-
-1. Fetches issue details (testcase, error message, description)
-2. Converts them into embeddings (semantic vectors)
-3. Searches similar past issues using FAISS
-4. Applies decision logic (HIGH / MEDIUM / LOW confidence)
-5. Returns best match with analysis (optional: auto-update IMS)
-
----
-
-## 🧠 Key Features
-
-- ✅ Fully offline (VDI compatible)
-- ✅ No cloud dependency (company compliant)
-- ✅ Semantic similarity using embeddings
-- ✅ Hybrid scoring (semantic + keyword)
-- ✅ IMS (JIRA) integration
-- ✅ Description fetching & cleaning
-- ✅ Caching for performance
-- ✅ Async API (FastAPI)
-- ✅ Feedback loop support
-- ✅ Safe auto-update (optional)
-
----
-
-## 🏗️ Architecture
-
-```
-IMS Issue → API → Fetch Description → Embedding → FAISS Search
-         → Hybrid Scoring → Decision Engine → Response / Update
-```
-
----
-
-## 📁 Project Structure
-
-```
-similarity-system/
-│
-├── app/
-│   ├── main.py              # FastAPI app
-│   ├── engine.py            # Orchestrator
-│   ├── search.py            # FAISS search logic
-│   ├── decision.py          # Confidence logic
-│   ├── embedder.py          # Embedding model
-│   ├── utils.py             # Text building & normalization
-│   ├── jira_client.py       # IMS API calls
-│   ├── jira_utils.py        # Helper utils
-│   ├── cache.py             # Description caching
-│   ├── config.py            # Credentials/config
-│
-├── scripts/
-│   ├── parse_txt.py
-│   ├── generate_embeddings.py
-│   ├── build_index.py
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   ├── feedback.json
-│
-├── models/
-│   ├── embeddings.npy
-│   ├── faiss.index
-│   ├── mapping.json
-│   ├── description_cache.json
-│
-├── model/                   # Sentence Transformer model
-├── offline_packages/        # Offline pip packages
-│
-├── test_engine.py
-├── test_search.py
-├── test_jira.py
-│
-├── .gitignore
-└── README.md
-```
+from app.engine import process_issue
 
----
+def get_user_input():
+    print("\nEnter Issue Details (type 'exit()' to quit)\n")
 
-## ⚙️ Setup (Offline - VDI Compatible)
+    testcase = input("Testcase: ")
+    if testcase.strip() == "exit()":
+        return None
 
-### 1️⃣ Download dependencies (LOCAL MACHINE)
+    error_message = input("Error Message: ")
+    if error_message.strip() == "exit()":
+        return None
 
-```bash
-pip download sentence-transformers -d offline_packages
-```
+    ims_link = input("IMS Link: ")
+    if ims_link.strip() == "exit()":
+        return None
 
-Download model:
+    return {
+        "testcase": testcase,
+        "error_message": error_message,
+        "ims_link": ims_link
+    }
 
-```python
-from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
-model.save('./model')
-```
+def main():
+    print("🚀 PCIeJ Similarity CLI Tool Started")
 
----
+    while True:
+        issue = get_user_input()
 
-### 2️⃣ Transfer to VDI
+        if issue is None:
+            print("👋 Exiting...")
+            break
 
-Copy:
-- `offline_packages/`
-- `model/`
+        print("\n🔍 Processing...\n")
 
----
+        result = process_issue(issue, auto_update=True)
 
-### 3️⃣ Install dependencies in VDI
+        print("📊 Decision:", result["decision"])
 
-```bash
-pip install --no-index --find-links=offline_packages sentence-transformers
-```
+        if result["best_match"]:
+            best = result["best_match"]
 
-Also install:
-```bash
-pip install fastapi uvicorn faiss-cpu numpy requests
-```
+            print("\n✅ Best Match Found:")
+            print("Issue ID:", best.get("issue_id"))
+            print("Score:", best.get("score"))
+            print("Analysis:", best.get("analysis"))
 
----
+        else:
+            print("\n❌ No strong match found")
 
-## 📊 Data Preparation
+        print("\n" + "="*50)
 
-### Input format (`issues.txt`)
 
-```
----ISSUE_START---
-issue_id: GR01
-testcase: something
-error_message: something
-analysis: something
-status: closed
-ims_link: http://...
----ISSUE_END---
-```
-
----
-
-### Convert to JSON
-
-```bash
-python -m scripts.parse_txt
-```
-
----
-
-### Generate embeddings
-
-```bash
-python -m scripts.generate_embeddings
-```
-
----
-
-### Build FAISS index
-
-```bash
-python -m scripts.build_index
-```
-
----
-
-## 🚀 Run API
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
----
-
-## 🧪 Test API
-
-```bash
-curl -X POST "http://localhost:8000/analyze_issue" \
--H "Content-Type: application/json" \
--d '{
-  "testcase": "PCIe test failure",
-  "error_message": "link training failed",
-  "ims_link": "https://ims.jira.samsungds.net/browser/PCIEJ-XXXXX"
-}'
-```
-
----
-
-## 🧠 Decision Logic
-
-| Score | Decision |
-|------|--------|
-| ≥ 0.93 | HIGH_CONFIDENCE |
-| ≥ 0.82 | MEDIUM_CONFIDENCE |
-| < 0.82 | LOW_CONFIDENCE |
-
----
-
-## 🔥 Accuracy Improvements
-
-### ✅ Weighted Embedding
-- Error + Testcase repeated for importance
-
-### ✅ Description Cleaning
-- Noise removed
-- Length limited
-
-### ✅ Hybrid Scoring
-```
-Final Score = 0.7 * semantic + 0.3 * keyword
-```
-
-### ✅ Text Normalization
-- Lowercase
-- Remove numbers
-
----
-
-## ⚡ Caching
-
-- IMS descriptions cached in:
-```
-models/description_cache.json
-```
-
-- Reduces API calls significantly
-
----
-
-## ⚙️ Async Processing
-
-- FastAPI runs processing in background thread
-- Handles multiple requests efficiently
-
----
-
-## 🔗 IMS Integration
-
-### Fetch description
-```
-GET /rest/api/2/issue/{issue_id}
-```
-
-### Add comment (optional)
-```
-POST /rest/api/2/issue/{issue_id}/comment
-```
-
----
-
-## 🔐 Config
-
-Set credentials in `app/config.py` or environment variables:
-
-```python
-JIRA_BASE_URL = "https://ims.jira.samsungds.net"
-JIRA_USERNAME = "your_username"
-JIRA_PASSWORD = "your_password"
-```
-
----
-
-## 👍 Feedback System
-
-Endpoint:
-
-```
-POST /feedback
-```
-
-Stores user feedback in:
-```
-data/feedback.json
-```
-
-Used for future tuning.
-
----
-
-## 🔒 Safety
-
-- Auto-update disabled by default
-- Only HIGH_CONFIDENCE allowed
-- Manual trigger via API flag
-
----
-
-## 📈 Future Improvements
-
-- 🔁 Duplicate detection
-- 📊 UI dashboard (React / internal UI)
-- ⚡ Batch processing
-- 🧠 Fine-tuned domain model
-- 📉 False positive reduction
-- 🔍 Better error parsing
-
----
-
-## 🏁 Final Flow
-
-```
-New IMS Issue
-   ↓
-API Trigger
-   ↓
-Fetch Description (cached)
-   ↓
-Embedding Generation
-   ↓
-FAISS Similarity Search
-   ↓
-Hybrid Scoring
-   ↓
-Decision Engine
-   ↓
-Return / (Optional Update IMS)
-```
-
----
-
-## 💡 Notes
-
-- Designed for **strict enterprise environments**
-- No external API usage
-- Fully deployable on internal network
-- Scales to 10k+ issues easily
-
----
-
-## 👨‍💻 Author
-
-Built as an internal AI system for automated issue similarity detection and analysis.
-
----
+if __name__ == "__main__":
+    main()
