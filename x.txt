@@ -1,99 +1,147 @@
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f6f8;
-    margin: 0;
-    padding: 40px;
-}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IMS Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
 
-.container {
-    max-width: 900px;
-    margin: auto;
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-}
+<body>
 
-h1 {
-    text-align: center;
-}
+<div class="container">
 
-.form-section {
-    display: flex;
-    flex-direction: column;
-}
+    <h1>IMS Login</h1>
 
-label {
-    margin-top: 15px;
-    font-weight: bold;
-}
+    <label>Username</label>
+    <input type="text" id="username">
 
-input,
-textarea {
-    padding: 10px;
-    margin-top: 5px;
-    font-size: 14px;
-}
+    <label>Password</label>
+    <input type="password" id="password">
 
-textarea {
-    min-height: 120px;
-}
+    <button onclick="login()">Login</button>
 
-button {
-    margin-top: 20px;
-    padding: 12px;
-    cursor: pointer;
-    font-size: 16px;
-}
+    <p id="error" style="color:red;"></p>
 
-.analysis-box {
-    background: #f1f1f1;
-    padding: 15px;
-    white-space: pre-wrap;
-    border-radius: 5px;
-}
+</div>
 
-.hidden {
-    display: none;
-}
+<script>
 
+async function login() {
 
-async function analyzeIssue() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-    const testcase = document.getElementById("testcase").value;
-    const error_message = document.getElementById("error_message").value;
-    const ims_link = document.getElementById("ims_link").value;
+    const response = await fetch("/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username,
+            password
+        })
+    });
 
-    document.getElementById("loading").classList.remove("hidden");
-    document.getElementById("result").classList.add("hidden");
+    const data = await response.json();
 
-    try {
-
-        const response = await fetch("/analyze_issue", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                testcase,
-                error_message,
-                ims_link
-            })
-        });
-
-        const data = await response.json();
-
-        document.getElementById("decision").innerText = data.decision;
-        document.getElementById("matched_issue").innerText = data.matched_issue || "N/A";
-        document.getElementById("score").innerText = data.score || "N/A";
-        document.getElementById("analysis").innerText = data.analysis || "No analysis found";
-
-        document.getElementById("result").classList.remove("hidden");
-
-    } catch (err) {
-        alert("Error calling API");
-        console.error(err);
+    if (data.success) {
+        window.location.href = "/";
+    } else {
+        document.getElementById("error").innerText =
+            "Invalid credentials";
     }
-
-    document.getElementById("loading").classList.add("hidden");
 }
+
+</script>
+
+</body>
+</html>
+
+from pydantic import BaseModel
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+from fastapi.responses import RedirectResponse
+from fastapi import Request
+
+import requests
+
+def verify_ims_login(username, password):
+
+    url = "https://ims.jira.samsungds.net/rest/api/2/myself"
+
+    response = requests.get(
+        url,
+        auth=(username, password),
+        verify=False
+    )
+
+    return response.status_code == 200
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request}
+    )
+
+
+
+@app.post("/login")
+async def login(login_req: LoginRequest, request: Request):
+
+    success = verify_ims_login(
+        login_req.username,
+        login_req.password
+    )
+
+    if not success:
+        return {"success": False}
+
+    # Store session
+    request.session["username"] = login_req.username
+    request.session["password"] = login_req.password
+
+    return {"success": True}
+
+
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+
+    if "username" not in request.session:
+        return RedirectResponse("/login")
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "username": request.session["username"]
+        }
+    )
+
+
+
+
+@app.get("/logout")
+async def logout(request: Request):
+
+    request.session.clear()
+
+    return RedirectResponse("/login")
+
+
+<div style="text-align:right;">
+    Logged in as {{ username }}
+
+    <a href="/logout">
+        <button>Logout</button>
+    </a>
+</div>
+
+
 
