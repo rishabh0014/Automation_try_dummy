@@ -1,56 +1,55 @@
-from app.engine import process_issue
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PCIeJ Similarity Tool</title>
 
-def get_user_input():
-    print("\nEnter Issue Details (type 'exit()' to quit)\n")
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
 
-    testcase = input("Testcase: ")
-    if testcase.strip() == "exit()":
-        return None
+<div class="container">
 
-    error_message = input("Error Message: ")
-    if error_message.strip() == "exit()":
-        return None
+    <h1>PCIeJ Similarity Tool</h1>
 
-    ims_link = input("IMS Link: ")
-    if ims_link.strip() == "exit()":
-        return None
+    <div class="form-section">
 
-    return {
-        "testcase": testcase,
-        "error_message": error_message,
-        "ims_link": ims_link
-    }
+        <label>Testcase</label>
+        <input type="text" id="testcase">
 
+        <label>Error Message</label>
+        <textarea id="error_message"></textarea>
 
-def main():
-    print("🚀 PCIeJ Similarity CLI Tool Started")
+        <label>IMS Link</label>
+        <input type="text" id="ims_link">
 
-    while True:
-        issue = get_user_input()
+        <button onclick="analyzeIssue()">Analyze</button>
 
-        if issue is None:
-            print("👋 Exiting...")
-            break
+    </div>
 
-        print("\n🔍 Processing...\n")
+    <div id="loading" class="hidden">
+        Processing...
+    </div>
 
-        result = process_issue(issue, auto_update=True)
+    <div id="result" class="hidden">
 
-        print("📊 Decision:", result["decision"])
+        <h2>Result</h2>
 
-        if result["best_match"]:
-            best = result["best_match"]
+        <p><strong>Decision:</strong> <span id="decision"></span></p>
 
-            print("\n✅ Best Match Found:")
-            print("Issue ID:", best.get("issue_id"))
-            print("Score:", best.get("score"))
-            print("Analysis:", best.get("analysis"))
+        <p><strong>Matched Issue:</strong> <span id="matched_issue"></span></p>
 
-        else:
-            print("\n❌ No strong match found")
+        <p><strong>Score:</strong> <span id="score"></span></p>
 
-        print("\n" + "="*50)
+        <h3>Suggested Analysis</h3>
 
+        <div class="analysis-box" id="analysis"></div>
 
-if __name__ == "__main__":
-    main()
+    </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+
+</body>
+</html>
