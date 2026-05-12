@@ -1,147 +1,153 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>IMS Login</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
+index.html
 
-<body>
+<div class="feedback-container">
 
-<div class="container">
+    <button onclick="toggleFeedback()">
+        Feedback / Review
+    </button>
 
-    <h1>IMS Login</h1>
+    <div id="feedback-box" class="hidden">
 
-    <label>Username</label>
-    <input type="text" id="username">
+        <textarea
+            id="feedback_text"
+            placeholder="Enter your feedback here..."
+        ></textarea>
 
-    <label>Password</label>
-    <input type="password" id="password">
+        <button onclick="submitFeedback()">
+            Submit Feedback
+        </button>
 
-    <button onclick="login()">Login</button>
+        <p id="feedback_status"></p>
 
-    <p id="error" style="color:red;"></p>
+    </div>
 
 </div>
 
-<script>
+style.css
 
-async function login() {
+.feedback-container {
+    margin-top: 40px;
+}
 
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+#feedback-box {
+    margin-top: 15px;
+}
 
-    const response = await fetch("/login", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            username,
-            password
-        })
-    });
+#feedback_text {
+    width: 100%;
+    min-height: 120px;
+}
 
-    const data = await response.json();
+script.js
 
-    if (data.success) {
-        window.location.href = "/";
-    } else {
-        document.getElementById("error").innerText =
-            "Invalid credentials";
+function toggleFeedback() {
+
+    const box = document.getElementById("feedback-box");
+
+    box.classList.toggle("hidden");
+}
+
+
+async function submitFeedback() {
+
+    const feedback =
+        document.getElementById("feedback_text").value;
+
+    if (!feedback.trim()) {
+        alert("Please enter feedback");
+        return;
+    }
+
+    try {
+
+        const response = await fetch("/submit_feedback", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                feedback
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            document.getElementById(
+                "feedback_status"
+            ).innerText = "Feedback submitted successfully";
+
+            document.getElementById(
+                "feedback_text"
+            ).value = "";
+
+        } else {
+
+            document.getElementById(
+                "feedback_status"
+            ).innerText = "Failed to submit feedback";
+        }
+
+    } catch (err) {
+
+        console.error(err);
+
+        document.getElementById(
+            "feedback_status"
+        ).innerText = "Error submitting feedback";
     }
 }
 
-</script>
+main.py
 
-</body>
-</html>
+class FeedbackRequest(BaseModel):
+    feedback: str
 
-from pydantic import BaseModel
+import os
+from datetime import datetime
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+@app.post("/submit_feedback")
+async def submit_feedback(
+    feedback_req: FeedbackRequest,
+    request: Request
+):
 
+    try:
 
-from fastapi.responses import RedirectResponse
-from fastapi import Request
+        os.makedirs("feedback", exist_ok=True)
 
-import requests
+        feedback_file = "feedback/feedback.txt"
 
-def verify_ims_login(username, password):
+        username = request.session.get("username", "unknown")
 
-    url = "https://ims.jira.samsungds.net/rest/api/2/myself"
+        client_ip = request.client.host
 
-    response = requests.get(
-        url,
-        auth=(username, password),
-        verify=False
-    )
+        timestamp = datetime.now().strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
-    return response.status_code == 200
+        content = f"""
+==================================================
+Timestamp : {timestamp}
+Username  : {username}
+IP        : {client_ip}
 
+Feedback:
+--------------------------------------------------
+{feedback_req.feedback}
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
+==================================================
 
-    return templates.TemplateResponse(
-        "login.html",
-        {"request": request}
-    )
+"""
 
+        with open(feedback_file, "a", encoding="utf-8") as f:
+            f.write(content)
 
+        return {"success": True}
 
-@app.post("/login")
-async def login(login_req: LoginRequest, request: Request):
+    except Exception as e:
 
-    success = verify_ims_login(
-        login_req.username,
-        login_req.password
-    )
+        print(e)
 
-    if not success:
         return {"success": False}
-
-    # Store session
-    request.session["username"] = login_req.username
-    request.session["password"] = login_req.password
-
-    return {"success": True}
-
-
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-
-    if "username" not in request.session:
-        return RedirectResponse("/login")
-
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "username": request.session["username"]
-        }
-    )
-
-
-
-
-@app.get("/logout")
-async def logout(request: Request):
-
-    request.session.clear()
-
-    return RedirectResponse("/login")
-
-
-<div style="text-align:right;">
-    Logged in as {{ username }}
-
-    <a href="/logout">
-        <button>Logout</button>
-    </a>
-</div>
-
-
-
