@@ -1,55 +1,99 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>PCIeJ Similarity Tool</title>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    margin: 0;
+    padding: 40px;
+}
 
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
+.container {
+    max-width: 900px;
+    margin: auto;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+}
 
-<div class="container">
+h1 {
+    text-align: center;
+}
 
-    <h1>PCIeJ Similarity Tool</h1>
+.form-section {
+    display: flex;
+    flex-direction: column;
+}
 
-    <div class="form-section">
+label {
+    margin-top: 15px;
+    font-weight: bold;
+}
 
-        <label>Testcase</label>
-        <input type="text" id="testcase">
+input,
+textarea {
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 14px;
+}
 
-        <label>Error Message</label>
-        <textarea id="error_message"></textarea>
+textarea {
+    min-height: 120px;
+}
 
-        <label>IMS Link</label>
-        <input type="text" id="ims_link">
+button {
+    margin-top: 20px;
+    padding: 12px;
+    cursor: pointer;
+    font-size: 16px;
+}
 
-        <button onclick="analyzeIssue()">Analyze</button>
+.analysis-box {
+    background: #f1f1f1;
+    padding: 15px;
+    white-space: pre-wrap;
+    border-radius: 5px;
+}
 
-    </div>
+.hidden {
+    display: none;
+}
 
-    <div id="loading" class="hidden">
-        Processing...
-    </div>
 
-    <div id="result" class="hidden">
+async function analyzeIssue() {
 
-        <h2>Result</h2>
+    const testcase = document.getElementById("testcase").value;
+    const error_message = document.getElementById("error_message").value;
+    const ims_link = document.getElementById("ims_link").value;
 
-        <p><strong>Decision:</strong> <span id="decision"></span></p>
+    document.getElementById("loading").classList.remove("hidden");
+    document.getElementById("result").classList.add("hidden");
 
-        <p><strong>Matched Issue:</strong> <span id="matched_issue"></span></p>
+    try {
 
-        <p><strong>Score:</strong> <span id="score"></span></p>
+        const response = await fetch("/analyze_issue", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                testcase,
+                error_message,
+                ims_link
+            })
+        });
 
-        <h3>Suggested Analysis</h3>
+        const data = await response.json();
 
-        <div class="analysis-box" id="analysis"></div>
+        document.getElementById("decision").innerText = data.decision;
+        document.getElementById("matched_issue").innerText = data.matched_issue || "N/A";
+        document.getElementById("score").innerText = data.score || "N/A";
+        document.getElementById("analysis").innerText = data.analysis || "No analysis found";
 
-    </div>
+        document.getElementById("result").classList.remove("hidden");
 
-</div>
+    } catch (err) {
+        alert("Error calling API");
+        console.error(err);
+    }
 
-<script src="/static/script.js"></script>
+    document.getElementById("loading").classList.add("hidden");
+}
 
-</body>
-</html>
