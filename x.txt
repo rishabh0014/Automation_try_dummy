@@ -1,219 +1,649 @@
-1. Introduction — Why do we need I3C?
+2. I3C Architecture and Basic Terminology
 
-📘 Wiki Content
+📘 Wiki Content — Ready to Paste
 
-Introduction
+2.1 I3C Bus Architecture
 
-I3C (Improved Inter-Integrated Circuit) is a communication protocol developed by MIPI Alliance for connecting sensors, controllers, and other peripheral devices using a two-wire interface.
+I3C is a two-wire serial communication bus that uses two signals:
 
-I3C was designed to address several limitations of the widely used I²C (Inter-Integrated Circuit) protocol while maintaining compatibility with existing I²C devices.
+* SCL (Serial Clock): Clock signal used for synchronizing communication.
+* SDA (Serial Data): Bidirectional data signal used to transfer information between devices.
 
-Modern embedded systems may contain a large number of peripheral devices such as sensors, power-management devices, controllers, and other components. As the number of devices increases, requirements such as higher communication speed, lower power consumption, efficient interrupt handling, dynamic device management, and reduced pin count become increasingly important.
+An I3C bus consists of one or more controllers and one or more targets connected to the same SCL and SDA lines.
 
-Traditional I²C has several limitations in these areas. I3C addresses these limitations while retaining the simplicity of a two-wire bus.
+A simplified I3C bus can be represented as:
+                       I3C BUS
+                ┌─────────────────┐
+                │                 │
+             SCL│                 │SDA
+                │                 │
+          ┌─────┴─────────────────┴─────┐
+          │                              │
+     Controller                     I3C Targets
+          │                    ┌─────────┼─────────┐
+          │                    │         │         │
+          ▼                    ▼         ▼         ▼
+       System              Target 1  Target 2  Target 3
 
-Why do we need I3C?
-
-The major motivations for introducing I3C are:
-
-* Higher data throughput: I3C provides significantly higher communication speeds than traditional I²C.
-* Lower power consumption: I3C makes greater use of push-pull signaling, reducing the dependence on pull-up resistors and enabling more efficient communication.
-* In-Band Interrupts (IBI): Devices can notify the controller using the same two-wire bus instead of requiring a dedicated interrupt GPIO for every device.
-* Dynamic Address Assignment: I3C devices can be dynamically assigned addresses by the controller, simplifying device discovery and configuration.
-* Hot-Join: Devices can request to join an already-active I3C bus without requiring the entire system to be restarted.
-* Common Command Codes (CCC): I3C defines standardized commands for common bus-management and device-management operations.
-* I²C coexistence: I3C is designed to allow supported legacy I²C devices to coexist on the same bus.
-* Two-wire interface: Like I²C, I3C uses the SDA and SCL signals, helping minimize the number of required pins and physical connections.
-
-I²C vs I3C — The Motivation
-
-The key idea behind I3C is not to completely replace I²C with an unrelated protocol, but to provide a more capable two-wire interface that addresses the requirements of modern systems while preserving interoperability with legacy I²C devices.
-
-In simplified terms:
-
-I²C provides a simple two-wire communication mechanism, while I3C builds on that concept to provide higher performance, better power efficiency, device management, and interrupt capabilities.
+All devices share the same physical bus. Communication is controlled by the controller, which initiates transfers and manages the bus.
 
 ⸻
 
-2. 🎤 Speech for the Session
+2.2 Controller
 
-You can say something like this:
+The Controller is the device responsible for managing communication on the I3C bus.
 
-“Before we understand how I3C works, the first question we should ask is — why do we need I3C when we already have I²C?”
+The controller can:
 
-“I²C has been around for a very long time and is still widely used. It gives us a simple two-wire interface using SDA and SCL, and we can connect multiple devices to the same bus.”
+* Initiate transfers
+* Generate the clock
+* Address targets
+* Assign dynamic addresses
+* Send Common Command Codes (CCC)
+* Manage bus resources
+* Respond to target requests such as In-Band Interrupts (IBI)
 
-“However, as embedded systems became more complex, the requirements also increased. We started having more sensors and peripheral devices, and these devices needed higher communication speed, lower power consumption, better interrupt mechanisms, and easier device management.”
-
-“Traditional I²C has limitations in several of these areas. For example, communication speed is limited compared with newer interfaces. Also, I²C devices commonly require separate GPIO lines when they need to generate interrupts.”
-
-“This is where I3C comes in. I3C keeps the basic idea of a two-wire bus, but adds features such as higher-speed communication, in-band interrupts, dynamic address assignment, hot-join, and standardized common commands.”
-
-“Another important point is that I3C was designed with backward compatibility in mind. Supported legacy I²C devices can coexist with I3C devices on the same bus.”
-
-“So, if I had to summarize the motivation for I3C in one sentence: I3C tries to provide the simplicity of a two-wire interface while offering much of the performance and functionality required by modern embedded systems.”
+An I3C system can support controller handoff and multiple controllers, although a typical system may have a single primary controller.
 
 ⸻
 
-3. 🧠 Now Let’s Understand It Properly
+2.3 Target
 
-Since you’re new to I3C, let’s forget the specification for a moment.
+A Target is a device that communicates with the controller over the I3C bus.
 
-Imagine you have a board containing:
+Examples include:
 
-figure
+* Sensors
+* PMICs
+* Memory-related devices
+* GPIO expanders
+* Other peripheral devices
 
-The controller needs to communicate with all these devices.
+A target normally responds to transactions initiated by the controller. However, I3C also allows targets to request bus access for mechanisms such as IBI and Hot-Join.
 
-You don’t want 2 wires for every device because that would become messy.
-
-So we use a shared bus:
-
-
-figure
-
-That’s the basic idea behind I²C and I3C.
+Note: I3C uses the terms Controller and Target rather than the older I²C terminology Master and Slave.
 
 ⸻
 
-Problem #1 — Speed
+2.4 Primary Controller and Secondary Controller
 
-Suppose your controller wants to read data from a sensor.
+I3C supports multiple devices that are capable of acting as controllers.
 
-With a traditional I²C bus, communication speed is relatively limited.
+Primary Controller
 
-As systems become more complex:
+The Primary Controller is the controller that currently has primary responsibility for managing the I3C bus.
 
-figure
+It normally:
 
-I3C addresses this with substantially higher data rates than traditional I²C.
+* Initializes the bus
+* Performs device discovery
+* Assigns dynamic addresses
+* Initiates transfers
+* Manages bus operations
 
-The important thing to remember for now is:
+Secondary Controller
 
-I3C was designed to provide a much faster two-wire bus than traditional I²C.
+A Secondary Controller is an I3C device that has controller capabilities but is not currently the primary controller.
 
-We’ll discuss the exact I3C modes and speeds later when we cover SDR and HDR.
+A secondary controller may be allowed to become the active controller through the appropriate controller handoff mechanism.
 
-⸻
+Therefore:
+             I3C BUS
+                |
+        ┌───────┴────────┐
+        │                │
+ Primary Controller   Secondary Controller
+        │
+        ├──── Target 1
+        ├──── Target 2
+        └──── Target 3
 
-Problem #2 — Interrupts
+2.5 Static Address
 
-This is one of the coolest I3C features.
+A Static Address is an address that is assigned to an I3C device before bus initialization and is associated with the device’s configuration.
 
-Imagine you have 5 sensors.
-
-A sensor may need to tell the CPU:
-
-“Hey! I have new data.”
-
-With a traditional design, you might have:
-
-figure
-
-Now you’re consuming several GPIO pins.
-
-I3C provides IBI — In-Band Interrupt.
-
-figure
-
-The device uses the same I3C bus to request the controller’s attention.
-
-That’s why it is called in-band.
-
-The interrupt information travels inside the communication bus itself, rather than requiring a separate physical interrupt line.
-
-We’ll later spend an entire section on IBI because there are interesting details around arbitration and controller response.
+Static addresses are useful during the initial stages of bus management and for compatibility with certain device configurations.
 
 ⸻
 
-Problem #3 — Device Addresses
+2.6 Dynamic Address
 
-In traditional I²C, devices generally have predefined/static addresses.
+A Dynamic Address is an address assigned to an I3C device by the controller during bus initialization or bus management.
 
-figure
+Dynamic addressing allows the controller to discover devices and assign addresses without requiring every device to have a unique fixed address.
 
-This can become inconvenient when:
+A simplified example:
+Target A ──┐
+Target B ──┼── Device Discovery ──> Controller
+Target C ──┘
 
-* multiple devices need the same address
-* devices have configurable addresses
-* the system configuration changes
+                    ↓
 
-I3C introduces Dynamic Address Assignment.
+          Dynamic Address Assignment
 
-figure
+          Target A → 0x20
+          Target B → 0x21
+          Target C → 0x22
 
-The controller can discover devices and assign dynamic addresses.
-
-Later we’ll go deep into:
-
-PID → BCR → DCR → ENTDAA → Dynamic Address
-
-That’s one of the most important parts of I3C.
+Dynamic addresses are an important part of the I3C bus initialization process and are closely associated with the ENTDAA procedure.
 
 ⸻
 
-Problem #4 — Adding Devices After Startup
+2.7 Provisional ID (PID)
 
-Imagine your system is already running:
+Each I3C device has a Provisional ID (PID) that provides identification information about the device.
 
-figure
-Now another device becomes available.
+The PID is used during device discovery and dynamic address assignment.
 
-How does it tell the controller:
-
-“I’m here. Please add me to the bus.”
-
-I3C provides Hot-Join for this purpose.
-
-figure
-
-Again, we’ll cover the actual procedure later.
+During ENTDAA, the controller can obtain identification information from targets and use the arbitration process to assign dynamic addresses.
 
 ⸻
 
-Problem #5 — Device Management
+2.8 Bus Characteristics Register (BCR)
 
-Suppose the controller wants to perform common operations such as:
+The Bus Characteristics Register (BCR) provides information about the capabilities and characteristics of an I3C device from the bus-management perspective.
 
-* Discover a device
-* Get device information
-* Assign an address
-* Enable/disable certain features
-* Manage the bus
-
-You don’t want every manufacturer to invent a completely different command format.
-
-I3C therefore defines CCC — Common Command Codes.
-
-Think of CCC as a standard vocabulary between the controller and I3C devices.
-
-figure
-
-We’ll later cover commands such as ENTDAA, GETPID, GETBCR, GETDCR, SETNEWDA, etc.
+The BCR helps the controller understand how a target behaves on the I3C bus and what capabilities it supports.
 
 ⸻
 
-The Big Picture
+2.9 Device Characteristics Register (DCR)
 
-So you can remember I3C’s motivation using this:
+The Device Characteristics Register (DCR) identifies the type or characteristics of the I3C device.
 
-figure
+The DCR can be used by the controller to determine what type of device it is communicating with.
 
-The fundamental idea:
+⸻
 
-I3C = Two-wire bus + higher performance + better device management + in-band interrupts + backward compatibility.
+2.10 Common Command Codes (CCC)
 
-That’s the mental model I want you to have before we move into the actual protocol.
+Common Command Codes (CCC) are standardized commands defined by the I3C specification.
+
+CCC commands allow the controller to perform common operations across I3C devices without requiring every device to define a completely different command mechanism.
+
+Examples include:
+
+* Device discovery
+* Dynamic address assignment
+* Reading PID/BCR/DCR information
+* Bus management
+* Enabling or disabling certain target capabilities
+
+CCC commands can be broadly classified as:
+
+* Broadcast CCC: Sent to multiple/all applicable targets.
+* Directed CCC: Sent to a specific target.
+
+⸻
+
+2.11 In-Band Interrupt (IBI)
+
+An In-Band Interrupt (IBI) allows an I3C target to request the controller’s attention using the I3C bus itself.
+
+Unlike a traditional design where a target may require a separate GPIO interrupt line:
+
+Traditional:
+
+Target ───── GPIO ─────> Controller
+
+I3C can use:
+I3C:
+
+Target ───── SDA/SCL ─────> Controller
+              IBI
+
+IBI reduces the need for dedicated interrupt pins and allows interrupt information to be transferred through the I3C bus.
+
+⸻
+
+2.12 Hot-Join
+
+Hot-Join allows an I3C target that was not present or active during initial bus configuration to request to join an already-running I3C bus.
+
+The controller can then perform the appropriate bus-management operations, including assigning a dynamic address to the device.
+
+⸻
+
+2.13 I3C Bus Roles — Summary
+
+The main roles can therefore be summarized as:
+
+Term
+
+Meaning
+
+Controller
+
+Manages and initiates bus communication
+
+Primary Controller
+
+Controller currently responsible for bus management
+
+Secondary Controller
+
+Controller-capable device that can participate in controller handoff
+
+Target
+
+Peripheral device connected to the bus
+
+Static Address
+
+Pre-configured device address
+
+Dynamic Address
+
+Address assigned by the controller
+
+PID
+
+Device identification information used during discovery
+
+BCR
+
+Bus capability/characteristics information
+
+DCR
+
+Device characteristics information
+
+CCC
+
+Standardized I3C management commands
+
+IBI
+
+Target-to-controller in-band notification
+
+Hot-Join
+
+Mechanism for a target to request joining an active bus
 
 
-One correction worth remembering
+Now Let’s Understand It From Scratch
 
-Don’t describe I3C simply as “a faster version of I²C.”
+The easiest way to understand I3C architecture is to imagine a company office.
 
-That’s technically too simplistic.
+Think of the I3C bus as the office communication system.
 
-A better description is:
+Controller = Manager
 
-I3C is a new two-wire communication protocol that builds upon concepts from I²C while introducing higher-speed operation, dynamic addressing, in-band interrupts, standardized device-management commands, and other features for modern systems.
+The controller manages communication.
 
-That wording will sound much stronger in an office technical session.
+                 Controller
+                     │
+          ┌──────────┼──────────┐
+          ↓          ↓          ↓
+       Sensor A   Sensor B    PMIC
+
+The controller basically says:
+
+“Sensor A, give me your data.”
+
+Sensor A responds.
+
+Then:
+
+“Sensor B, I want your data.”
+
+And so on.
+
+⸻
+
+1. SCL and SDA
+
+These are the two physical signals.
+
+SCL
+
+SCL = Serial Clock
+
+It provides timing.
+
+Think of it as:
+
+“When should everyone sample the data?”
+
+SDA
+
+SDA = Serial Data
+
+This carries the actual information.
+
+So:
+
+SCL → Timing
+SDA → Data
+
+This is why I3C is called a two-wire bus.
+
+⸻
+
+2. Controller vs Target
+
+This is probably the most important distinction.
+
+Suppose your system looks like:
+
+             CPU
+              |
+       I3C Controller
+              |
+       ───────┼──────── I3C Bus
+              |
+       ┌──────┼───────┐
+       ↓      ↓       ↓
+    Sensor   PMIC   EEPROM
+
+The controller manages the bus.
+
+The other devices are targets.
+
+So:
+
+Controller → initiates/manages communication
+Target → responds/participates in communication
+
+But don’t make the mistake of thinking:
+
+Target = completely passive.
+
+That’s not true for I3C.
+
+A target can request attention through mechanisms such as IBI and Hot-Join.
+
+⸻
+
+3. Why “Controller/Target” instead of “Master/Slave”?
+
+You may see older I²C documentation using:
+
+Master / Slave
+
+I3C terminology uses:
+
+Controller / Target
+
+So in your presentation, consistently use:
+
+Master  → Controller
+Slave   → Target
+
+This is the terminology you’ll encounter in the I3C specification.
+
+⸻
+
+4. Primary Controller vs Secondary Controller
+
+This can initially be confusing.
+
+Imagine:
+
+                I3C BUS
+                   |
+        ┌──────────┴──────────┐
+        │                     │
+     Controller A          Controller B
+        │                     │
+      Primary              Secondary
+
+Both devices have the capability to control the bus.
+
+But normally one is currently responsible for bus management.
+
+That is the Primary Controller.
+
+The other is a Secondary Controller.
+
+The important concept is:
+
+Controller capability and current controller role are not necessarily the same thing.
+
+This becomes relevant when discussing controller handoff and multi-controller systems.
+
+For your first session, you don’t need to go too deeply into controller handoff.
+
+⸻
+
+5. Static Address vs Dynamic Address
+
+This is VERY important.
+
+Imagine three devices:
+
+Sensor A → 0x20
+Sensor B → 0x21
+Sensor C → 0x22
+
+If these addresses are permanently configured, they’re effectively static.
+
+But imagine a system where devices don’t necessarily have unique preconfigured addresses.
+
+I3C can do:
+
+             Controller
+                 |
+             Discovery
+                 |
+       ┌─────────┼─────────┐
+       ↓         ↓         ↓
+    Device A  Device B  Device C
+       |         |         |
+       ↓         ↓         ↓
+      0x20      0x21      0x22
+
+The controller assigns those addresses.
+
+These are Dynamic Addresses.
+
+This is why you’ll eventually encounter:
+
+ENTDAA
+
+ENTDAA = Enter Dynamic Address Assignment
+
+Don’t worry about the exact sequence yet.
+
+Just remember:
+
+ENTDAA is the mechanism used to discover I3C targets and assign them dynamic addresses.
+
+We’ll do a dedicated deep dive when you reach that topic.
+
+⸻
+
+6. PID, BCR and DCR
+
+These three are often encountered together.
+
+Think of a device introducing itself:
+
+Controller:
+"Who are you?"
+
+Target:
+"Here is my PID."
+
+Controller:
+"What are your bus capabilities?"
+
+Target:
+"Here is my BCR."
+
+Controller:
+"What kind of device are you?"
+
+Target:
+"Here is my DCR."
+
+Very simplified, but useful as a mental model.
+
+PID
+
+Provisional ID
+
+Used to identify the device during discovery/address assignment.
+
+BCR
+
+Bus Characteristics Register
+
+Provides information about the device’s I3C bus characteristics/capabilities.
+
+DCR
+
+Device Characteristics Register
+
+Provides information identifying the device’s characteristics/type.
+
+These become particularly important during ENTDAA.
+
+⸻
+
+7. CCC
+
+Think of CCC as a standardized language.
+
+Without CCC, every device could potentially have its own management commands.
+
+With CCC:
+
+Controller
+    |
+    | Standard CCC
+    ↓
+Target
+
+The I3C specification defines standardized commands for common bus/device management operations.
+
+For example:
+
+GETPID
+GETBCR
+GETDCR
+ENTDAA
+SETNEWDA
+RSTDAA
+...
+
+You don’t need to memorize these now.
+
+We’ll cover them properly later.
+
+⸻
+
+8. IBI
+
+This is one of the biggest architectural differences from traditional I²C.
+
+Suppose a sensor has new data.
+
+Traditional approach:
+
+Sensor
+   |
+   | GPIO
+   ↓
+CPU
+I3C:
+Sensor
+   |
+   | IBI request
+   ↓
+I3C Bus
+   |
+   ↓
+Controller
+
+The target essentially says:
+
+“I need the controller’s attention.”
+
+The controller can then communicate with that target.
+
+That’s In-Band Interrupt.
+
+⸻
+
+9. Hot-Join
+
+Imagine the bus has already started:
+
+Boot
+ ↓
+I3C initialization
+ ↓
+Devices configured
+ ↓
+Bus running
+
+Then another I3C target becomes available.
+
+It can use Hot-Join to request participation in the bus.
+
+Think:
+
+“Hey controller, I’m a new device and I want to join.”
+
+The controller can then manage the device and assign it an address.
+
+⸻
+
+⭐ The Most Important Architecture Diagram
+
+For your Wiki, I’d actually recommend having one central diagram like this:
+
+                         I3C BUS
+                ┌───────────────────────┐
+                │     SCL + SDA         │
+                └───────────────────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+       Primary Controller       Secondary Controller
+              │
+      ┌───────┼────────┬──────────┐
+      │       │        │          │
+      ▼       ▼        ▼          ▼
+   Target   Target   Target    I3C Target
+      │       │        │
+      │       │        │
+      └───────┴────────┴───────────────┐
+                                      │
+                             Bus Management
+                         ┌────────────┼───────────┐
+                         │            │           │
+                      Dynamic       CCC         IBI
+                      Address                   Hot-Join
+This gives the audience a single mental picture that you can keep referring to throughout the presentation.
+
+⸻
+
+🎤 How I’d Present This Section
+
+After your “Why I3C?” introduction, transition with:
+
+“Now that we understand why I3C was introduced, let’s look at the basic architecture and terminology.”
+
+“At the physical level, I3C is a two-wire bus consisting of SCL and SDA. Multiple devices can share these two lines.”
+
+“The device responsible for managing communication is called the Controller, and the peripheral devices are called Targets. I3C can also support controller-capable devices, which can act as Primary or Secondary Controllers.”
+
+“One important difference from traditional I²C is the addressing mechanism. I3C supports dynamic address assignment, where the controller can discover devices and assign them addresses during bus initialization.”
+
+“During this process, concepts such as PID, BCR and DCR become important because they provide information about the device and its capabilities.”
+
+“I3C also defines Common Command Codes, or CCCs, which provide standardized commands for bus and device management.”
+
+“Finally, two features that we’ll discuss later are IBI and Hot-Join. IBI allows a target to notify the controller using the bus itself, while Hot-Join allows a target to request joining an already-active bus.”
+
+“So these are the basic building blocks we’ll use for understanding the rest of the I3C protocol.”
+
+One thing I would change from the previous section
+
+Don’t try to explain ENTDAA, CCC, IBI, HDR, etc. in detail here. Just introduce the terminology. Otherwise your audience will get overloaded before you’ve explained how an actual I3C transfer works.
+
+The natural next section should be “I3C vs I²C”, because once they understand Controller/Target, SDA/SCL, and addresses, the differences become much easier to explain.
+
+
