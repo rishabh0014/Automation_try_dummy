@@ -1,35 +1,627 @@
-🧠 Understanding — I3C vs I²C
+5. I3C Transfer Types
 
-Think of I3C as an attempt to solve the problems that appear when an I²C bus has to support more devices, more data, lower power, and more complex system behavior.
+The important thing here is to first understand how communication actually takes place on an I3C bus. Later, when we discuss ENTDAA, CCC, IBI, etc., you’ll already understand the transfer framework.
 
-1. Why is I3C faster?
-I²C primarily uses open-drain signaling. A device can pull the line LOW, but to make it HIGH, the pull-up resistor has to bring the signal back up. The speed of this rising edge depends on the pull-up resistor and the capacitance of the bus. As the bus gets larger, this becomes a limitation. I3C uses push-pull signaling during appropriate parts of communication, allowing the device to actively drive HIGH as well as LOW. This gives much faster transitions and therefore enables higher-speed communication.
+⸻
 
-2. Why does I3C have dynamic addressing?
-With I²C, devices generally have predefined addresses. Imagine you have two identical sensors that both want address 0x48. You have an address conflict. Some I²C devices provide hardware pins or configuration mechanisms to change the address, but that’s not universal. I3C provides a standardized mechanism where the controller can discover devices and assign dynamic addresses. This is primarily done through ENTDAA (Enter Dynamic Address Assignment).
+📘 Wiki Content — I3C Transfer Types
 
-3. Why does I3C have IBI?
-Imagine 8 sensors connected to a processor. With traditional I²C, each sensor might need a separate GPIO interrupt line:
+5.1 Overview
 
-That’s a lot of pins and PCB routing. I3C allows a target to say “I need the controller’s attention” using the I3C bus itself. That’s IBI — In-Band Interrupt. The interrupt information travels in-band, meaning through the communication interface rather than through a separate physical GPIO.
+I3C supports multiple types of bus transfers to accommodate different communication requirements.
 
-4. Why does I3C have CCC?
-In I²C, the basic bus protocol is standardized, but what a device-specific command means is usually defined by that device’s specification. I3C introduces Common Command Codes (CCC) so that common bus/device-management operations have standardized commands. For example, the controller can use standard commands to obtain device information or manage addresses. Think of CCC as a common language for bus management.
+At a high level, I3C communication can be categorized into:
 
-5. Why does I3C have Hot-Join?
-Normally, the controller initializes the bus and discovers the devices that are present. But what if an I3C device becomes available after the bus is already running? I3C provides Hot-Join, allowing that target to request to join the active bus. The controller can then handle the device and assign it an address as required.
+* SDR (Single Data Rate)
+* HDR (High Data Rate)
+* I²C legacy transfers
 
-6. Why can I3C coexist with I²C devices?
-I²C already exists in an enormous number of systems. Requiring every existing peripheral to be replaced would make I3C difficult to adopt. Therefore, I3C was designed so that supported legacy I²C devices can coexist on the same physical bus with I3C devices.
+I3C also defines different transaction types based on the direction and intended recipients of the communication:
 
-7. Why is power efficiency better?
-With I²C’s open-drain signaling, when a device holds a line LOW, current flows through the pull-up resistor. I3C’s push-pull operation reduces reliance on this resistive pull-up behavior during normal high-speed transfers. Combined with faster transfers, this can improve overall bus power efficiency.
+* Private transfers
+* Common Command Code (CCC) transfers
+* Broadcast transfers
+* Directed transfers
+* In-Band Interrupt (IBI) transfers
+* Hot-Join requests
 
-8. Why does I3C support multiple controllers?
-Some systems can have more than one device capable of controlling the bus. I3C defines roles such as Primary Controller and Secondary Controller and mechanisms for controller handoff. This makes the bus architecture more flexible. However, for your basic understanding, think of the common case as one Primary Controller + multiple Targets.
+The controller determines which type of transfer is performed and controls the bus accordingly.
 
-So the overall relationship is:
+⸻
 
-The key thing to remember: I3C is not just “faster I²C.” Each major I3C feature exists to solve a particular limitation or scaling problem of traditional I²C.
+5.2 SDR — Single Data Rate
 
-I’ll follow this exact structure for the remaining sections: Wiki Content → 🧠 Understanding (one block) → 🎤 Speech.
+SDR (Single Data Rate) is the fundamental I3C transfer mode.
+
+SDR provides the primary mechanism for normal I3C communication and is designed to provide significantly higher performance than traditional I²C while maintaining a relatively simple signaling scheme.
+
+A simplified SDR transaction can be represented as:
+START
+  ↓
+Dynamic Address
+  ↓
+R/W
+  ↓
+ACK
+  ↓
+Data
+  ↓
+ACK
+  ↓
+Data
+  ↓
+ACK
+  ↓
+STOP
+
+SDR uses:
+
+* SCL for clocking
+* SDA for bidirectional data
+* Open-drain signaling for specific bus phases
+* Push-pull signaling for normal data transfer
+
+⸻
+
+5.3 SDR Addressing
+
+During a normal private SDR transfer, the controller first identifies the target using its 7-bit dynamic address.
+
+The address is followed by the R/W bit, indicating whether the controller is requesting a read or performing a write.
+
+Conceptually:
+
+┌──────────────┬─────┐
+│ 7-bit Address│ R/W │
+└──────────────┴─────┘
+
+The target responds according to the protocol-defined acknowledgment mechanism.
+
+Once the target has been selected, data can be transferred between the controller and target.
+
+⸻
+
+5.4 Private Transfers
+
+A Private Transfer is a transfer between the controller and a specific target.
+
+Private Write
+
+Controller
+    |
+    | Address + Write
+    ↓
+ Target
+    |
+    | Data
+    ↓
+ Target
+
+The controller sends data to a specific target.
+
+Private Read
+
+Controller
+    |
+    | Address + Read
+    ↓
+ Target
+    |
+    | Data
+    ↓
+Controller
+
+The target provides data requested by the controller.
+
+Private transfers are typically used for normal device-specific communication.
+
+⸻
+
+5.5 CCC Transfers
+
+Common Command Codes (CCC) are standardized I3C commands used for common bus and device management operations.
+
+CCC transfers are broadly classified into:
+
+Broadcast CCC
+
+A Broadcast CCC is intended for all applicable targets on the bus.
+
+                 Controller
+                     |
+                    CCC
+                     |
+       ┌─────────────┼─────────────┐
+       ↓             ↓             ↓
+    Target A      Target B      Target C
+
+Directed CCC
+
+A Directed CCC targets a specific device.
+
+                 Controller
+                     |
+                CCC + Address
+                     |
+                     ↓
+                  Target B
+
+CCC transfers are used for operations such as:
+
+* Dynamic address assignment
+* Device identification
+* Bus management
+* Enabling/disabling target capabilities
+* Reading device characteristics
+
+⸻
+
+5.6 SDR vs HDR
+
+I3C defines HDR (High Data Rate) modes in addition to SDR.
+
+The purpose of HDR is to provide significantly higher data throughput than normal SDR communication.
+
+The I3C specification defines multiple HDR modes, including:
+
+* HDR-DDR
+* HDR-TSP
+* HDR-TSL
+
+Each HDR mode uses a different signaling/encoding approach and has different use cases.
+
+For a basic I3C implementation:
+
+I3C
+ |
+ ├── SDR
+ |
+ └── HDR
+      ├── HDR-DDR
+      ├── HDR-TSP
+      └── HDR-TSL
+
+SDR is generally the fundamental mode that must be understood before studying HDR.
+
+⸻
+
+5.7 HDR-DDR
+
+HDR-DDR (High Data Rate — Double Data Rate) transfers data on both clock edges.
+
+Conceptually:
+
+SCL:  ┌───┐   ┌───┐   ┌───┐
+      │   │   │   │   │   │
+──────┘   └───┘   └───┘   └───
+
+SDA:    D0      D1      D2
+        ↑       ↑       ↑
+
+Data can be transferred on both the rising and falling edges of the clock, increasing throughput compared with single-edge transfer.
+
+HDR-DDR is intended for high-speed data transfer between I3C devices.
+
+⸻
+
+5.8 HDR-TSP and HDR-TSL
+
+I3C also defines:
+
+* HDR-TSP — Ternary Symbol Pure
+* HDR-TSL — Ternary Symbol Legacy
+
+These modes use ternary-symbol-based signaling to achieve high data rates.
+
+They are more complex than SDR and are generally less important for an introductory I3C session.
+
+For most firmware engineers starting with I3C, the recommended learning order is:
+
+SDR
+ ↓
+CCC
+ ↓
+Dynamic Address Assignment
+ ↓
+IBI
+ ↓
+HDR
+
+5.9 I²C Legacy Transfers
+
+One of the important characteristics of I3C is its ability to coexist with compatible legacy I²C devices.
+
+The I3C controller can perform transactions that allow supported I²C targets to communicate on the shared bus.
+
+Conceptually:
+
+                    I3C Controller
+                          |
+                    I3C Bus
+              ┌───────────┼───────────┐
+              ↓           ↓           ↓
+          I3C Target   I3C Target   I²C Target
+
+The controller must use bus operations that are compatible with the legacy I²C target.
+
+This enables gradual migration from I²C to I3C.
+
+⸻
+
+5.10 Broadcast vs Directed Communication
+
+This distinction is important when discussing CCC.
+
+Broadcast
+
+The controller sends a command that applies to multiple targets.
+
+Controller
+     |
+     | Broadcast
+     |
+ ┌───┼────┬────┐
+ ↓   ↓    ↓    ↓
+ T1  T2   T3   T4
+
+Directed
+
+The controller selects one particular target.
+
+Controller
+     |
+     | Directed
+     |
+     └──────────> Target 2
+
+This distinction is primarily important for CCC operations.
+
+⸻
+
+5.11 Transaction Terminology
+
+Some useful terms when analyzing I3C transfers are:
+
+START
+
+Indicates the beginning of a transaction.
+
+STOP
+
+Indicates the end of a transaction.
+
+Repeated START
+
+Allows the controller to start another transaction without releasing the bus between operations.
+
+ACK / NACK
+
+Used to indicate whether a transfer element has been accepted or whether the receiving side is not acknowledging it.
+
+Dynamic Address
+
+The address used by an I3C target for normal communication after address assignment.
+
+⸻
+
+5.12 Simplified I3C Communication Flow
+
+A typical system can be visualized as:
+
+                 Bus Initialization
+                        |
+                        ↓
+               Dynamic Address
+                  Assignment
+                        |
+                        ↓
+                Normal Operation
+                        |
+          ┌─────────────┼─────────────┐
+          ↓             ↓             ↓
+      Private       CCC Commands     IBI
+       Transfer
+          |
+       ┌──┴──┐
+       ↓     ↓
+     Write   Read
+
+HDR modes can be entered when higher data throughput is required.
+
+⸻
+
+🧠 Understanding — I3C Transfer Types
+
+The easiest way to understand I3C transfers is to imagine that the controller is the person coordinating a conversation.
+
+There are basically two questions:
+
+Question 1: Who am I talking to?
+
+That’s determined by the address.
+
+Question 2: What kind of conversation am I having?
+
+That’s determined by the type of transfer.
+
+⸻
+
+1. SDR is your starting point
+
+Don’t think of SDR as just another optional feature.
+
+Think:
+
+SDR is the basic communication mode you should understand first.
+
+Imagine:
+
+Controller → Target
+
+The controller says:
+
+“I want to talk to device 0x20.”
+
+Then:
+
+“I want to write.”
+
+or:
+
+“I want to read.”
+
+Then the actual data is transferred.
+
+So:
+
+Address → Direction → Data
+
+is the basic mental model.
+
+⸻
+
+2. Private transfer = “I want to talk to this one device”
+
+Suppose you have:
+
+Target A = Temperature sensor
+Target B = Accelerometer
+Target C = PMIC
+
+If the controller wants temperature:
+
+Controller
+     |
+     | Address of Target A
+     ↓
+Target A
+     |
+     | Temperature data
+     ↓
+Controller
+
+That’s a private transfer.
+
+It is basically normal device-to-device communication.
+
+⸻
+
+3. Write vs Read
+
+This is exactly the same basic concept you may already know from I²C.
+
+Write
+
+Controller ───────> Target
+                  Data
+
+Example:
+
+“Configure sensor sampling rate to 100 Hz.”
+
+Read
+
+Controller <─────── Target
+                  Data
+
+Example:
+
+“Give me the current temperature.”
+
+⸻
+
+4. CCC is different from a normal private transfer
+
+This distinction is important.
+
+A normal private transfer generally means:
+
+“I’m talking to a particular device’s application/register interface.”
+
+CCC means:
+
+“I’m performing a standardized I3C bus/device-management operation.”
+
+For example:
+
+Controller
+    |
+    | GETPID
+    ↓
+Target
+
+or
+
+Controller
+    |
+    | SETNEWDA
+    ↓
+Target
+
+These aren’t arbitrary sensor commands. They are defined by the I3C specification.
+
+⸻
+
+5. Broadcast vs Directed CCC
+
+Imagine the controller wants to send a command to everyone:
+
+“All devices, disable this feature.”
+
+That’s Broadcast CCC.
+
+             Controller
+                 |
+              Broadcast
+          ┌──────┼──────┐
+          ↓      ↓      ↓
+         T1     T2     T3
+
+But if it says:
+
+“Target 2, change your address.”
+
+that’s Directed CCC.
+
+Controller ───────────> Target 2
+
+This distinction becomes extremely important when we study Dynamic Address Assignment.
+
+⸻
+
+6. Why HDR exists
+
+Imagine SDR gives you:
+Data → Data → Data → Data
+
+but your application needs significantly more throughput.
+
+You could increase the clock frequency, but there are electrical and protocol limitations.
+
+HDR provides additional mechanisms for transferring more information per unit time.
+
+Think of it as:
+
+SDR:
+One lane
+
+HDR:
+More information per clock / more efficient signaling
+
+Don’t memorize the exact HDR modes yet.
+
+For now:
+
+SDR = fundamental I3C communication
+
+HDR = higher-throughput communication modes
+
+We’ll revisit HDR later after you understand SDR properly.
+
+⸻
+
+7. One important correction about ACK
+
+Since you’re coming from an I²C background, be careful here.
+
+You may be tempted to think:
+
+“I3C is exactly the same as I²C: address → ACK → data → ACK.”
+
+That’s not a safe mental model.
+
+I3C has different acknowledgment and signaling behavior depending on the transfer phase and mode.
+
+For example, HDR modes do not simply follow the traditional I²C ACK-per-byte model.
+
+So for now, remember:
+
+I3C retains some familiar transaction concepts from I²C, but its detailed signaling and acknowledgment rules are different.
+
+When we do the actual SDR waveform, we’ll go bit-by-bit.
+
+⸻
+
+8. The most important flow to remember
+
+For now, keep this in your head:
+
+                    I3C Communication
+                           |
+             ┌─────────────┴─────────────┐
+             │                           │
+            SDR                         HDR
+             │                           │
+      Normal communication       Higher data rate
+             │
+       ┌─────┴─────┐
+       ↓           ↓
+    Private       CCC
+    Transfer    Transfer
+       │           │
+    ┌──┴──┐    ┌───┴────┐
+    ↓     ↓    ↓        ↓
+  Write Read Broadcast Directed
+
+And separately:
+
+Target → Controller
+       IBI
+
+IBI isn’t simply a normal controller-initiated private transfer; it is a target-initiated bus request mechanism.
+
+⸻
+
+🎤 Speech for This Section
+
+“Now that we understand the physical layer, let’s look at the different types of transfers supported by I3C.”
+
+“At the highest level, I3C provides SDR, or Single Data Rate, and HDR, or High Data Rate, modes. SDR is the fundamental mode that we should understand first.”
+
+“In a normal private transfer, the controller communicates with a particular target using its dynamic address. The transfer can be a write, where the controller sends data to the target, or a read, where the target provides data to the controller.”
+
+“Apart from normal private transfers, I3C also defines Common Command Codes, or CCCs. CCCs are standardized commands used for bus and device management. CCCs can be broadcast to multiple targets or directed to a specific target.”
+
+“For example, a command such as GETPID is related to obtaining device identification information, while commands related to dynamic address assignment are also defined through the I3C command framework.”
+
+“I3C also provides HDR modes when higher data throughput is required. One example is HDR-DDR, where data can be transferred using both edges of the clock. I3C also defines HDR-TSP and HDR-TSL, which use ternary-symbol-based signaling.”
+
+“Finally, I3C maintains coexistence with compatible legacy I²C devices, allowing an I3C controller to communicate with both I3C and I²C targets on the same bus.”
+
+“For now, the main thing to remember is that SDR is the foundation. Once we understand SDR transactions, it becomes much easier to understand CCC, dynamic address assignment, IBI, and eventually HDR.”
+
+“So our learning path from here will be: first understand an SDR transaction in detail, then look at dynamic addressing and CCC, and later come back to the more advanced HDR modes.”
+
+⸻
+
+🔬 Spec-Level Points You Should Know
+
+Since you specifically asked me to include specification knowledge, these are the details I’d keep in your preparation notes even if you don’t put all of them on the Wiki:
+
+* I3C defines SDR and multiple HDR modes.
+* HDR modes include HDR-DDR, HDR-TSP, and HDR-TSL.
+* SDR uses a 7-bit address for I3C device addressing.
+* I3C supports Dynamic Address Assignment in addition to static-address mechanisms.
+* CCCs are divided into Broadcast CCCs and Directed CCCs.
+* Private transfers are controller-to-specific-target transactions.
+* I3C supports coexistence with compatible legacy I²C devices.
+* IBI and Hot-Join are target-initiated bus requests and should not be mentally treated as ordinary controller-initiated private transfers.
+* HDR is not simply “SDR at a faster clock.” The HDR modes introduce different signaling/encoding mechanisms.
+* The exact electrical behavior of SDA/SCL changes depending on the phase/mode, so avoid drawing one generic “I3C waveform” and presenting it as applicable to every transaction.
+
+⭐ One thing I recommend changing in your presentation
+
+Don’t make the next slide immediately about all the HDR modes. Your next section should be “SDR Transaction — Step-by-Step.”
+
+That’s where we can take an actual transaction like:
+
+Controller → Target 0x20 → Write → Register → Data
+
+
+and go through every bit on SDA/SCL, START, address, T-bit, ACK behavior, direction changes, repeated START, STOP, and when the bus switches between open-drain and push-pull.
+
+That will give you the foundation needed for the rest of your I3C session.
+
+
+
+
