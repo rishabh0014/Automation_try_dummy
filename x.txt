@@ -1,426 +1,1192 @@
 5.1 Single Data Rate (SDR) Mode
 
-Single Data Rate (SDR) is the default and fundamental communication mode of an I3C Bus.
+Single Data Rate (SDR) Mode is the default and fundamental communication mode of the I3C Bus.
 
-The I3C Bus is initialized and configured in SDR Mode. SDR Mode is also used for entering other I3C modes and for several fundamental I3C features, including:
+The I3C Bus is initialized and configured in SDR Mode. Other I3C Modes, such as HDR, are entered from SDR using the mechanisms defined by the specification.
 
-* Common Command Codes (CCC)
-* In-Band Interrupts (IBI)
+SDR is based on the I²C protocol but introduces several important enhancements and variations required for I3C operation.
+
+The SDR section defines the fundamental mechanisms required for operating an I3C Bus, including:
+
+* Bus configuration
+* SDR bus communication
+* Bus conditions
+* Bus initialization
 * Dynamic Address Assignment
-* Transition from I²C operation to I3C operation
-
-The I3C SDR protocol is significantly similar to the I²C protocol. This similarity allows I3C Devices and compatible Legacy I²C Target Devices to coexist on the same physical bus.
-
-However, SDR introduces several important differences from I²C, particularly in signaling, data-word handling, addressing, arbitration, and I3C-specific bus-management mechanisms.
-
-5.1.1 SDR as the Default I3C Mode
-
-SDR is the default operating mode of an I3C Bus.
-
-An I3C Bus does not begin directly in HDR Mode. Instead, the bus is initialized and configured using SDR.
-
-HDR operation is entered from SDR using the appropriate Enter HDR Common Command Code.
-
-Therefore, SDR acts as the foundation for the overall I3C protocol.
-
-Bus Initialization
-        |
-        v
-      SDR Mode
-        |
-        +------------------+
-        |                  |
-        v                  v
-   Normal SDR          Enter HDR CCC
-                           |
-                           v
-                       HDR Mode
-
-5.1.2 SDR and Legacy I²C Coexistence
-
-I3C SDR intentionally maintains substantial similarity with I²C.
-
-This allows an I3C Controller to communicate with compatible Legacy I²C Target Devices on the same bus.
-
-At the same time:
-
-* I3C Targets can distinguish I3C traffic from applicable Legacy I²C traffic.
-* Legacy I²C Targets should not interfere with normal I3C communication.
-* Legacy I²C Controller Devices are not supported as Controllers on an I3C Bus.
-
-This coexistence allows systems to migrate from I²C to I3C without replacing every device simultaneously.
-
-5.1.3 Important Differences from I²C
-
-Although SDR is I²C-like, it is not identical to I²C.
-
-Important differences include:
-
-Addressing
-
-I3C supports Dynamic Address Assignment and uses I3C-specific address-management mechanisms.
-
-Signaling
-
-I3C uses both Open-Drain and Push-Pull signaling depending on the portion of the transfer.
-
-Data Words
-
-I3C SDR Data Words are 9 bits long, similar in length to I²C Data Words, but the meaning of the ninth bit differs.
-
-For Controller-written SDR data, the ninth bit is used as Parity, rather than the Target ACK used in an I²C data byte.
-
-Bus Management
-
-I3C adds mechanisms such as:
-
-* Dynamic Address Assignment
-* In-Band Interrupt
 * Hot-Join
-* Common Command Codes
-* Multiple Controller support
-
-These mechanisms are not part of traditional I²C operation.
-
-5.1.4 SDR Transfer Concept
-
-At a simplified level, an SDR transfer can be represented as:
-
-START
-   |
-   v
-Address Header
-   |
-   v
-ACK
-   |
-   v
-Data Words
-   |
-   v
-STOP
-
-However, the detailed I3C SDR protocol differs from I²C and must be understood using the specific I3C signaling rules defined later in Section 5.1.
-
-In particular, the Address Header and Data Word behavior have I3C-specific rules.
-
-5.1.5 SDR Data Word
-
-An I3C SDR Data Word consists of:
-
-* 8 data bits
-* 1 additional bit
-
-The ninth bit has different meanings depending on the transaction.
-
-For example, for Controller-written SDR data, the ninth bit is the parity bit associated with the preceding eight data bits.
-
-This is different from I²C, where the ninth clock is normally used for ACK/NACK.
-
-I3C SDR Data Word
-+--------+-----+
-| D7...D0|  P  |
-+--------+-----+
-  8 bits   1 bit
-
-5.1.6 SDR Communication Speed
-
-The I3C Basic v1.1.1 specification defines SDR operation with SCL clock speeds up to 12.5 MHz, subject to the applicable electrical and timing requirements.
-
-The higher effective performance compared with traditional I²C is not achieved only by increasing the clock frequency.
-
-I3C also improves bus efficiency through:
-
-* Push-Pull signaling
-* Reduced protocol overhead in selected operations
-* Efficient data transfer
-* Dynamic addressing and bus-management mechanisms
-
-5.1.7 Key Characteristics of SDR
-
-Characteristic	I3C SDR
-Full name	Single Data Rate
-Default I3C mode	Yes
-Bus initialization	SDR
-Typical signaling	Open-Drain + Push-Pull
-Maximum SCL clock in Basic v1.1.1	Up to 12.5 MHz
-Legacy I²C coexistence	Supported
-Dynamic Addressing	Supported
-CCC	Supported
-IBI	Supported
-HDR entry	Through SDR
-Data Word	8 data bits + ninth protocol bit
-
-Summary
-
-SDR is the foundation of I3C communication.
-
-It provides an I²C-like communication mechanism while introducing I3C-specific improvements in addressing, signaling, bus management, and data transfer.
-
-Understanding SDR is essential before studying:
-
-* Bus Initialization
-* Dynamic Address Assignment
-* I3C Address Arbitration
-* IBI
-* CCC
+* In-Band Interrupt (IBI)
 * Multiple Controllers
-* HDR entry and HDR communication
-
-Understanding
-
-The most important sentence from the specification is:
-
-“SDR Mode is the default Mode of the I3C Bus.” 
-
-This is much more important than simply remembering that SDR means Single Data Rate.
-
-Think of the I3C protocol as having a base mode and optional advanced modes.
-
-                 I3C
-                  |
-                 SDR
-                  |
-        +---------+---------+
-        |                   |
-   Normal operation      Enter HDR
-                            |
-                           HDR
-
-The bus starts with SDR. You don’t power up an I3C bus and immediately start sending HDR traffic.
-
-Why?
-
-Because the bus first needs to establish things such as which devices exist, their addresses, their capabilities, and the bus configuration. SDR provides the common protocol foundation used for this.
-
-The specification explicitly states that SDR is used not only for normal communication but also for CCCs, IBI, and the transition from I²C to I3C through Dynamic Address Assignment. 
-
-Why is SDR so similar to I²C?
-
-This is deliberate.
-
-I3C was designed so that an existing system doesn’t necessarily need to replace every I²C device.
-
-Imagine this bus:
-
-             I3C BUS
-          SDA + SCL
-              |
-       +------+------+
-       |      |      |
-      I3C    I3C    I²C
-   Target A Target B Target
-
-The Controller should be able to communicate with both types of devices.
-
-Therefore, SDR deliberately retains substantial I²C-like behavior.
-
-The specification even states that I3C traffic to an I²C Target is designed so that the Legacy I²C Target does not incorrectly respond to I3C traffic. 
-
-But this leads to a very important point:
-
-SDR is similar to I²C, but SDR is not I²C.
-
-This is where you should be careful when explaining I3C to firmware engineers.
-
-For example, if you see:
-
-I²C:
-
-8 data bits + ACK/NACK
-
-you should not automatically assume:
-
-I3C SDR:
-
-8 data bits + ACK/NACK
-
-The specification specifically points out that I3C SDR Data Words are also 9 bits, but the ninth bit has different semantics. For Controller-written data, the ninth bit is Parity, rather than the Target ACK used by I²C. 
-
-That is a very important protocol-level difference.
-
-So:
-
-I²C Data Byte
-
-D7 D6 D5 D4 D3 D2 D1 D0 | ACK/NACK
-        8 bits            | 9th bit
-
-whereas for the relevant I3C SDR Controller-written data:
-
-I3C SDR Data Word
-
-D7 D6 D5 D4 D3 D2 D1 D0 | P
-        8 bits            | Parity
-
-This is one of the reasons we shouldn’t describe I3C as simply “faster I²C.”
+* Timing Control
+* Common Command Codes (CCC)
+* SDR error detection and recovery
+* Target Reset
 
 ⸻
 
-Why does I3C use Push-Pull in SDR?
+5.1.1 Bus Configuration
 
-This connects directly to what we discussed earlier.
+The I3C Bus can connect multiple I3C Devices and, where supported, Legacy I²C Devices.
 
-Traditional I²C relies heavily on open-drain signaling.
+The specification defines multiple roles for devices participating in an I3C Bus.
 
-The problem is that when the line needs to transition from LOW → HIGH, the device releases the line and the pull-up resistor has to charge the bus capacitance.
+An I3C Device may have Controller capability, Target capability, or both.
 
-At higher speeds, that becomes a limitation.
+A Controller-capable Device can operate as the Primary Controller or Secondary Controller, while Target-capable devices can operate as I3C Targets.
 
-I3C therefore uses Push-Pull signaling for appropriate portions of SDR, allowing the transmitter to actively drive HIGH as well as LOW.
+The Primary Controller is the Controller responsible for initially configuring the bus.
 
-That provides much faster transitions.
+A Secondary Controller is capable of becoming the Active Controller at a later time.
+
+The specification also allows devices to expose multiple roles or functions, including virtual targets in applicable implementations.
+
+During bus initialization, the Primary Controller obtains the required characteristics of the devices on the bus and assigns Dynamic Addresses to devices that require them.
+
+The enabled capabilities of I3C Devices are described through their Characteristics Registers.
+
+Important characteristics include:
+
+* BCR — Bus Characteristics Register
+* DCR — Device Characteristics Register
+* LVR — Legacy Virtual Register, where applicable
+
+The specification also defines different I3C bus configurations depending on whether Legacy I²C Devices are present.
+
+Bus configurations
+
+A bus may be:
+
+1. Pure Bus
+    Only I3C Devices are present.
+2. Mixed Fast Bus
+    I3C Devices and compatible Legacy I²C Devices are present.
+3. Mixed Slow/Limited Bus
+    I3C Devices and Legacy I²C Devices are present, but the Legacy I²C Devices impose additional limitations on bus operation.
+
+The exact electrical and protocol requirements for these configurations are defined by the specification.
+
+⸻
+
+5.1.2 Bus Communication
+
+SDR is based on the I²C protocol but introduces I3C-specific variations.
+
+The basic communication mechanism uses:
+
+* START
+* Address Header
+* Data
+* STOP
+
+I3C START and STOP signaling is similar to I²C, although I3C timing requirements differ.
+
+An SDR transaction generally consists of an Address Header followed by one or more Data Words.
+
+The Address Header identifies the intended Target or indicates a special operation.
+
+I3C SDR supports:
+
+* Private Write
+* Private Read
+* Broadcast communication
+* Directed communication
+* Common Command Code communication
+* Target-initiated requests such as IBI
+
+Address Header
+
+The Address Header contains the address information and transfer direction.
+
+The address used during normal I3C communication is generally the Target’s Dynamic Address.
+
+Special address values and address-header patterns are also used for protocol mechanisms such as Broadcast CCCs and Target-initiated requests.
+
+SDR Data Word
+
+An SDR Data Word consists of an 8-bit data field together with an additional protocol bit.
+
+The meaning of this additional bit depends on the type and direction of the transfer.
+
+Therefore, I3C SDR should not be treated as simply:
+
+8-bit I²C byte + I²C ACK
+
+The detailed meaning of the ninth bit and the associated acknowledgment/termination behavior are defined by the specific SDR transaction.
+
+Private Transfers
+
+A private transfer is communication between the Controller and a particular Target.
+
+It can be:
+
+* Controller Write
+* Controller Read
+
+Private transfers are normally used by the system-level application protocol to access the Target’s registers, data, configuration, or other functionality.
+
+Broadcast and Directed Messages
+
+I3C provides standardized messages that can be sent:
+
+* Broadcast — to applicable Targets on the bus
+* Directed — to a specific Target
+
+The standardized management mechanism for these messages is CCC.
+
+⸻
+
+5.1.3 Bus Conditions
+
+The I3C protocol defines specific bus conditions used to control the beginning, continuation, and termination of communication.
+
+Important bus conditions include:
+
+* START
+* STOP
+* Repeated START
+* Bus Free condition
+* Bus Available condition
+* Other protocol-specific conditions required for arbitration and transfer control
+
+START
+
+A START condition indicates the beginning of a bus transaction.
+
+STOP
+
+A STOP condition indicates the end of a transaction and releases the bus for subsequent activity.
+
+Repeated START
+
+A Repeated START allows the Controller to begin another transaction without first releasing the bus through a STOP condition.
+
+This is particularly useful when a Controller needs to change transaction direction or perform a sequence of related operations while maintaining control of the bus.
+
+The exact electrical timing and signaling requirements are defined in the I3C electrical and protocol specifications.
+
+⸻
+
+5.1.4 Bus Initialization and Dynamic Address Assignment Mode
+
+The Primary Controller is responsible for initializing the I3C Bus.
+
+During initialization, the Primary Controller establishes the configuration required for communication with the Devices on the bus.
+
+A major part of initialization is Dynamic Address Assignment (DAA).
+
+The purpose of Dynamic Address Assignment is to provide I3C Devices with Dynamic Addresses that can be used during normal communication.
+
+The Primary Controller obtains device information and assigns addresses to Devices participating in the I3C Bus.
+
+Device identification and characteristics are associated with information such as:
+
+* PID
+* BCR
+* DCR
+
+The Dynamic Address Assignment procedure allows multiple devices to participate in address arbitration so that each device can receive an appropriate Dynamic Address.
+
+The specification also defines mechanisms for assigning addresses to devices that have Static Addresses and for handling devices that join or rejoin the bus.
+
+Dynamic Address Assignment is not merely an addressing convenience. It is part of the overall I3C bus initialization and device-management architecture.
+
+⸻
+
+5.1.5 Hot-Join Mechanism
+
+Hot-Join allows an I3C Device to request participation in an I3C Bus after the bus has already been initialized.
+
+A Target that has not been configured as part of the existing bus can issue a Hot-Join request.
+
+The Controller detects the request and can subsequently perform the necessary bus-management operations, including Dynamic Address Assignment.
 
 Conceptually:
 
-I²C:
+Bus already running
+        |
+        v
+New I3C Device appears
+        |
+        v
+Hot-Join Request
+        |
+        v
+Controller responds
+        |
+        v
+Device configuration / DAA
+        |
+        v
+Device becomes an active participant
 
-LOW ────────╮
-            ╰────── HIGH
-             ^
-        resistor rise
-
-
-I3C Push-Pull:
-
-LOW ────────┐
-            └────── HIGH
-             ^
-        active drive
-
-But I3C cannot simply use Push-Pull for everything because multiple devices may need to participate in bus arbitration or request access to the bus.
-
-That is why I3C has carefully defined transitions between Open-Drain and Push-Pull behavior.
-
-We’ll see the exact rules when we reach 5.1.2 Bus Communication.
+Hot-Join is therefore different from normal bus initialization.
 
 ⸻
 
-Why is 12.5 MHz significant?
+5.1.6 In-Band Interrupt (IBI)
 
-The specification gives SDR an SCL clock rate of up to 12.5 MHz in I3C Basic v1.1.1. 
+In-Band Interrupt allows an I3C Target to request the attention of the Controller using the I3C Bus itself.
 
-But don’t interpret that as:
+Instead of requiring a separate interrupt wire for each Target:
 
-“I3C is 12.5× faster than I²C.”
+Target ---- GPIO ----> Controller
 
-That’s not accurate.
+the Target can use the I3C bus:
 
-I²C has several modes and different maximum clock frequencies, and effective throughput depends on protocol overhead, signaling, read/write direction, turnaround, ACK behavior, etc.
+Target
+   |
+   | IBI
+   v
+I3C Bus
+   |
+   v
+Controller
 
-I3C improves effective performance through a combination of:
+An IBI request is arbitrated using the I3C protocol.
 
-* higher clock rate,
-* Push-Pull signaling,
-* reduced overhead,
-* more efficient data transfers,
-* improved bus-management mechanisms.
+Dynamic Addresses provide priority information during IBI arbitration.
 
-So clock frequency ≠ effective data throughput.
+A Target may optionally provide additional information as part of its IBI.
 
-This distinction becomes particularly important later when we compare SDR with HDR.
+IBI can therefore be used for events such as:
+
+* New sensor data
+* Status changes
+* Device events
+* Attention requests
+
+IBI is a Target-initiated bus request, rather than a normal Controller-initiated private transaction.
 
 ⸻
 
-The biggest takeaway
+5.1.7 I3C Bus with Multiple Controllers
 
-Think of SDR as the foundation layer of I3C:
+I3C supports multiple Controller-capable Devices.
 
-                    I3C
-                     |
-                    SDR
-                     |
-       +-------------+-------------+
-       |             |             |
-     Normal         CCC           IBI
-   transfers      commands       requests
-       |
-       |
- Dynamic Address
- Assignment
-       |
-       v
-    Bus setup
-       |
-       v
-   Enter HDR
+However, only one Controller is Active at a time.
 
-The specification then breaks SDR into much more detailed pieces:
+The Controller that initially configures the bus is the Primary Controller.
 
-5.1.1 → Bus Configuration
+Another Controller-capable Device can operate as a Secondary Controller.
 
-5.1.2 → Bus Communication
+The Secondary Controller can initially behave as a Target and can later become the Active Controller through the defined Controller handoff mechanisms.
 
-5.1.3 → Bus Conditions
+Conceptually:
 
-5.1.4 → Bus Initialization and Dynamic Address Assignment
+Initial:
+Device A → Primary / Active Controller
+Device B → Secondary Controller capability + Target role
+After Controller Handoff:
+Device A → Target
+Device B → Active Controller
 
-5.1.5 → Hot-Join
+This allows systems to change which device controls the bus without physically changing the bus wiring.
 
-5.1.6 → In-Band Interrupt
+The specification defines the required procedures for Controller-role handoff and coordination between Controller-capable Devices.
 
-5.1.7 → Multiple Controllers
+⸻
 
-5.1.9 → Common Command Codes
+5.1.8 Timing Control
 
-and more. 
+The full I3C specification defines advanced Timing Control capabilities.
 
-So 5.1 is not one transaction. It is essentially the main body of the basic I3C protocol.
+These include mechanisms for synchronizing or correlating timing information between Devices.
 
-Now we are entering Section 5 of the MIPI I3C Basic specification, which is the actual I3C Protocol section.
+However, it is important to distinguish full I3C from I3C Basic v1.1.1.
 
-The first protocol mode defined by the specification is SDR, or Single Data Rate.
+I3C Basic v1.1.1 excludes the full Timing Control functionality identified in the specification, including:
 
-The most important thing to remember here is that SDR is the default mode of the I3C Bus.
+* Synchronous Time Control
+* Asynchronous Time Control Modes 1–3
 
-The I3C bus is initialized and configured in SDR mode. We don’t directly initialize the bus in HDR.
+Therefore, these features should not be presented as mandatory/available I3C Basic v1.1.1 functionality.
 
-SDR is also used for several other important operations, including Common Command Codes, In-Band Interrupts, and the transition from I²C operation to I3C operation through Dynamic Address Assignment.
+For I3C Basic, the normal SDR/HDR timing requirements remain defined by the applicable electrical and timing specifications.
 
-So SDR is essentially the foundation on which the rest of the I3C protocol is built.
+⸻
 
-Now, SDR is deliberately very similar to I²C.
+5.1.9 Common Command Codes (CCC)
 
-Why?
+Common Command Codes provide standardized commands for managing I3C Devices and the I3C Bus.
 
-Because I3C was designed to coexist with Legacy I²C Target devices.
+CCC commands are divided broadly into:
 
-For example, we could have an I3C Controller, several I3C Targets, and an existing I²C Target all connected to the same SDA and SCL lines.
+* Broadcast CCC
+* Directed CCC
 
-The Controller needs to be able to communicate with all of them.
+Broadcast CCC
 
-However, we should not conclude that I3C SDR is simply I²C at a higher frequency.
+A Broadcast CCC is intended for all applicable I3C Targets on the bus.
 
-There are several important differences.
+Examples include commands used for common bus-wide configuration and management.
 
-One of them is the signaling.
+Directed CCC
 
-I3C uses both Open-Drain and Push-Pull signaling. Push-Pull allows the bus to transition faster than relying only on the pull-up resistor.
+A Directed CCC targets a specific I3C Device.
 
-Another important difference is the Data Word.
+The Controller selects the Target using its Dynamic Address.
 
-An I3C SDR Data Word is 9 bits long, just like an I²C data transfer has nine clock cycles for a byte plus acknowledgment.
+CCC commands are used for functions including:
 
-But the meaning of the ninth bit is not always the same.
+* Device discovery
+* Device identification
+* Dynamic Address management
+* Device configuration
+* Event management
+* Bus management
+* Status/configuration operations
 
-For Controller-written SDR data, the ninth bit is used for parity, rather than being the Target ACK bit used in I²C.
+Examples of important CCCs include:
 
-This is a very important detail because it shows that although the protocol looks I²C-like at a high level, the actual signaling rules are different.
+* ENTDAA — Enter Dynamic Address Assignment
+* SETDASA — Set Dynamic Address from Static Address
+* SETAASA — Set All Addresses from Static Addresses
+* SETNEWDA — Set New Dynamic Address
+* GETPID — Get Provisional ID
+* GETBCR — Get Bus Characteristics Register
+* GETDCR — Get Device Characteristics Register
+* ENEC — Enable Events
+* DISEC — Disable Events
+* RSTDAA — Reset Dynamic Address Assignment
 
-The specification defines SDR clock speeds up to 12.5 MHz in I3C Basic v1.1.1.
+CCC therefore forms a standardized bus/device management interface.
 
-But we should not simply say that I3C is twelve-and-a-half times faster than I²C.
+⸻
 
-Actual throughput depends on the entire protocol, including overhead, signaling, direction changes, and the type of transaction.
+5.1.10 Error Detection and Recovery Methods for SDR
 
-The important idea is that I3C improves bus efficiency using a combination of higher clock rate, Push-Pull signaling, and more efficient protocol mechanisms.
+I3C defines mechanisms for detecting and recovering from protocol errors.
 
-So if I summarize SDR in one sentence:
+For SDR operation, the specification defines:
 
-SDR is the default and foundational I3C communication mode, designed to retain I²C-like compatibility while adding I3C-specific signaling, addressing, and bus-management features.
+* Target Error Types
+* Controller Error Types
+* Corresponding detection mechanisms
+* Recommended/defined recovery behavior
 
-And this is where the rest of Section 5 becomes interesting.
+The v1.1.1 specification defines seven Target error types:
 
-The specification now breaks SDR into Bus Configuration, Bus Communication, Bus Conditions, Dynamic Address Assignment, Hot-Join, IBI, Multiple Controllers, CCC, and error handling.
+TE0
+TE1
+TE2
+TE3
+TE4
+TE5
+TE6
 
-So next, we’ll start with 5.1.1 — Bus Configuration, where we look at exactly how an I3C bus can be composed and what different device roles the specification defines.
+and four Controller error types:
+
+CE0
+CE1
+CE2
+CE3
+
+These mechanisms address situations such as:
+
+* Unexpected termination
+* Incorrect protocol behavior
+* Bus conditions inconsistent with the expected transaction
+* Controller/Target communication failures
+* Stuck-bus situations
+
+The specification also defines recovery mechanisms for conditions such as Controller crashes, unexpected reset, and SDA-related stuck conditions.
+
+Error handling is an important part of I3C because a shared bus must be capable of recovering without necessarily requiring a complete system reset.
+
+⸻
+
+5.1.11 Target Reset
+
+I3C provides a standardized Target Reset mechanism that allows the Controller to request reset-related actions from a Target without requiring an additional physical reset wire.
+
+The mechanism uses:
+
+* RSTACT CCC
+* Target Reset Pattern
+
+RSTACT configures the reset action that a Target should perform when it subsequently detects the Target Reset Pattern.
+
+Depending on the configured action, Target Reset can be used for different levels of reset, including:
+
+* Peripheral reset
+* Full/Chip reset
+* Wake-from-deep-sleep behavior
+
+The Target Reset mechanism therefore provides a standardized in-band mechanism for controlling Target reset behavior.
+
+⸻
+
+5.1 Overall SDR Architecture
+
+The complete SDR portion can be viewed as:
+
+                         SDR MODE
+                            |
+       +--------------------+--------------------+
+       |                    |                    |
+ Bus Configuration    Bus Communication    Bus Conditions
+       |                    |                    |
+       |              +-----+-----+              |
+       |              |           |              |
+       |           Private       CCC             |
+       |           Transfers                      |
+       |                                           |
+       +-------------------+-----------------------+
+                           |
+                    Bus Initialization
+                           |
+                  Dynamic Address Assignment
+                           |
+          +----------------+----------------+
+          |                                 |
+       Hot-Join                            IBI
+          |                                 |
+          +----------------+----------------+
+                           |
+                  Multiple Controllers
+                           |
+                      Timing Control
+                           |
+                    Error Detection
+                           |
+                     Target Reset
+
+SDR is therefore much more than the basic Controller-to-Target data transfer. It provides the foundation for bus configuration, addressing, device management, Target-initiated requests, multi-Controller operation, error recovery, and reset management.
+
+Now we are entering the main protocol part of the MIPI I3C Basic specification.
+
+Section 5.1 is Single Data Rate, or SDR Mode.
+
+The most important thing to understand is that SDR is not just one transfer format. It is the default mode of the I3C Bus, and a large portion of the fundamental I3C protocol is defined under this section.
+
+The specification covers bus configuration, communication, bus conditions, initialization and Dynamic Address Assignment, Hot-Join, In-Band Interrupts, multiple Controllers, Timing Control, Common Command Codes, error handling, and Target Reset.
+
+So let’s go through these one by one.
+
+First is Bus Configuration.
+
+An I3C bus can contain multiple I3C Devices and, where supported, Legacy I²C Devices.
+
+An I3C Device can have Controller capability, Target capability, or both.
+
+The Controller that initially configures the bus is called the Primary Controller.
+
+A Controller-capable device that can later become the Active Controller is a Secondary Controller.
+
+One important point is that Controller capability and the current Controller role are not the same thing.
+
+A Secondary Controller can be behaving as a Target while another Controller is currently active.
+
+Next is Bus Communication.
+
+SDR is based on I²C, so the basic signaling will look familiar to anyone who knows I²C.
+
+We have START, an Address Header, Data, and STOP.
+
+But I3C SDR is not identical to I²C.
+
+There are differences in signaling, timing, addressing, data handling, and bus-management mechanisms.
+
+SDR supports normal private communication between a Controller and a Target, as well as standardized Broadcast and Directed messages.
+
+Next are Bus Conditions.
+
+These define the conditions that control how a transaction starts, continues, and ends.
+
+START begins a transaction.
+
+STOP ends it.
+
+A Repeated START allows the Controller to continue with another transaction without releasing the bus through a STOP.
+
+The next major part is Bus Initialization and Dynamic Address Assignment.
+
+When the system powers up, the Primary Controller is responsible for configuring the bus.
+
+One of the key things it needs to do is assign Dynamic Addresses to the I3C Devices.
+
+The device characteristics, including information represented through PID, BCR, and DCR, are used during device management and initialization.
+
+Once the devices have Dynamic Addresses, the Controller can address them during normal I3C operation.
+
+Now suppose a new device appears after the bus has already been initialized.
+
+That’s where Hot-Join comes in.
+
+The device can request to join the already-running I3C bus.
+
+The Controller can then perform the required configuration and address assignment.
+
+Another important feature is In-Band Interrupt, or IBI.
+
+In a traditional system, a sensor might need a separate GPIO to interrupt the host.
+
+With I3C, the Target can use the I3C bus itself to request the Controller’s attention.
+
+So instead of having a separate interrupt wire, the Target can generate an IBI request.
+
+IBI is not just an ordinary private transfer initiated by the Controller. It is a defined Target-initiated bus request, including arbitration when multiple Targets request attention.
+
+Next is Multiple Controllers.
+
+I3C allows multiple Devices to have Controller capability.
+
+But there is still only one Active Controller at a time.
+
+For example, Device A can initially be the Primary Controller while Device B is a Secondary Controller.
+
+Later, through the defined Controller handoff mechanism, Device B can become the Active Controller.
+
+So the important distinction is between Controller capability and Active Controller status.
+
+Then we have Timing Control.
+
+The full I3C specification contains advanced Timing Control functionality.
+
+However, we need to be careful because we are studying the I3C Basic specification.
+
+Some of the advanced Timing Control features of full I3C are explicitly excluded from I3C Basic v1.1.1.
+
+Next comes one of the most important mechanisms in I3C: Common Command Codes, or CCC.
+
+CCC provides standardized commands for managing the bus and devices.
+
+CCC can be Broadcast or Directed.
+
+Broadcast means the command is intended for all applicable Targets.
+
+Directed means the command is intended for a particular Target.
+
+CCC can be used for operations such as obtaining device information, assigning addresses, changing configuration, enabling or disabling events, and other bus-management operations.
+
+Then we have Error Detection and Recovery.
+
+I3C defines specific error types for both Targets and Controllers.
+
+For SDR, the specification defines Target Error Types TE0 through TE6 and Controller Error Types CE0 through CE3.
+
+The idea is that when something unexpected happens on the bus, the protocol provides mechanisms to identify the type of failure and recover the bus instead of simply assuming that communication has permanently failed.
+
+Finally, we have Target Reset.
+
+I3C provides an in-band mechanism to request reset-related actions from a Target without necessarily requiring a separate reset signal.
+
+The Controller can configure the reset action using the RSTACT CCC, and the Target Reset Pattern subsequently causes the configured reset action.
+
+So, if we look at the complete picture, Section 5.1 gives us almost everything required to understand the basic operation of an I3C bus.
+
+We start with:
+
+Bus Configuration.
+
+Then:
+
+Bus Communication.
+
+Then:
+
+Bus Conditions.
+
+Then:
+
+Initialization and Dynamic Address Assignment.
+
+And after the bus is running, we have:
+
+Hot-Join,
+
+IBI,
+
+Multiple Controllers,
+
+CCC,
+
+Error Recovery,
+
+and Target Reset.
+
+This is why SDR is so important.
+
+It is not simply the low-speed mode of I3C.
+
+It is the foundation of the I3C protocol.
+
+Once we understand 5.1, we have the foundation required to move into HDR and understand exactly what HDR is changing compared with SDR.
+
+
+
+---
+Understanding — 5.1 Single Data Rate (SDR) Mode
+
+The most important thing to understand about Section 5.1 is that SDR is not merely a data-transfer format. In the MIPI I3C Basic specification, SDR is the fundamental/default operating mode of the I3C Bus, and a large portion of the basic bus functionality is defined around it.
+
+A useful way to visualize the relationship is:
+
+                         I3C BUS
+                            |
+                         SDR Mode
+                            |
+       +--------------------+--------------------+
+       |                    |                    |
+ Bus Configuration    Bus Communication    Bus Management
+       |                    |                    |
+ Device Roles         Private Transfer          CCC
+ BCR/DCR/LVR          Read / Write               |
+       |                    |             +-------+-------+
+ Initialization             |             |               |
+       |                    |         Broadcast       Directed
+ Dynamic Address            |
+ Assignment                 |
+       |              +-----+-----+
+       |              |           |
+    Hot-Join          IBI       Normal
+                              Transfer
+
+The reason SDR is so important is that the I3C Bus does not start by immediately performing high-speed HDR communication. The bus is initialized and configured in SDR Mode. Once the bus is appropriately configured, the Controller can continue normal SDR communication or use the defined mechanisms to enter HDR operation.
+
+So SDR is effectively the base protocol state from which the rest of the I3C functionality is built.
+
+⸻
+
+1. Bus Configuration
+
+The first question when creating an I3C bus is:
+
+What devices are connected to the bus and what can each device do?
+
+An I3C bus can contain multiple I3C Devices and, where supported, Legacy I²C Devices.
+
+An I3C Device can have different capabilities.
+
+For example:
+
+I3C Device
+     |
+     +---- Target capability
+     |
+     +---- Controller capability
+     |
+     +---- Controller + Target capability
+
+This distinction is important.
+
+A device being Controller-capable does not mean that it is currently controlling the bus.
+
+For example:
+
+Device A → Active Controller
+Device B → Controller-capable Target
+Device C → Target
+
+Device B has the capability to become a Controller, but Device A is currently the Active Controller.
+
+This becomes important later when we study Multiple Controllers and Controller Handoff.
+
+The specification also defines device characteristics using registers such as BCR, DCR and, where applicable, LVR. These characteristics help the Controller understand what type of device it is communicating with and what capabilities it has.
+
+⸻
+
+2. Bus Communication
+
+Once the bus is configured, the Controller needs to communicate with Targets.
+
+The fundamental SDR communication is intentionally similar to I²C.
+
+Conceptually:
+
+START
+   ↓
+Address Header
+   ↓
+Data
+   ↓
+STOP
+
+This similarity is intentional because I3C needs to coexist with Legacy I²C Targets.
+
+However, this does not mean that I3C SDR is simply I²C running at a higher frequency.
+
+There are important differences in:
+
+* Signaling
+* Timing
+* Addressing
+* Data-word handling
+* Arbitration
+* Bus management
+
+For example, I3C uses Dynamic Addresses, whereas traditional I²C systems normally use statically configured addresses.
+
+SDR supports normal Private Transfers, where the Controller communicates with a specific Target.
+
+For example:
+
+Controller
+     |
+     | Write
+     ↓
+Target A
+
+or:
+
+Controller
+     |
+     | Read
+     ↓
+Target A
+
+SDR also provides the foundation for CCC operations and Target-initiated mechanisms such as IBI.
+
+⸻
+
+3. Why does I3C remain similar to I²C?
+
+This is one of the fundamental design decisions behind I3C.
+
+Imagine an existing system containing:
+
+             I3C Controller
+                   |
+        +----------+----------+
+        |          |          |
+     I3C Target I3C Target I²C Target
+
+Replacing every existing I²C device would be expensive and impractical.
+
+Therefore, I3C was designed so that compatible Legacy I²C Targets can coexist on the same physical bus.
+
+This is why SDR retains many concepts familiar from I²C.
+
+However, I3C adds mechanisms that I²C does not have, such as:
+
+* Dynamic Address Assignment
+* CCC
+* IBI
+* Hot-Join
+* Controller role management
+* HDR modes
+
+Therefore, the correct mental model is:
+
+I3C SDR is I²C-like, but it is not I²C.
+
+⸻
+
+4. Bus Conditions
+
+Communication needs defined conditions for starting and stopping transactions.
+
+The important concepts include:
+
+* START
+* STOP
+* Repeated START
+* Bus availability/free conditions
+
+At a high level:
+
+START
+  ↓
+Transaction
+  ↓
+Repeated START
+  ↓
+Another transaction
+  ↓
+STOP
+
+A START indicates that the Controller is beginning bus activity.
+
+A STOP indicates that the current transaction sequence has ended.
+
+A Repeated START allows the Controller to continue with another transaction without first issuing STOP.
+
+This is conceptually similar to I²C, but I3C defines its own timing and signaling requirements.
+
+Later, when studying the actual SDR waveform, we should look at exactly what happens to SDA and SCL for each of these conditions.
+
+⸻
+
+5. Bus Initialization and Dynamic Address Assignment
+
+This is one of the most important parts of I3C.
+
+When the system starts, the Controller cannot simply assume:
+
+Target A = 0x20
+Target B = 0x21
+Target C = 0x22
+
+Instead, I3C provides mechanisms for Dynamic Address Assignment.
+
+Conceptually:
+
+                    Bus Initialization
+                           |
+                           ↓
+                  Primary Controller
+                           |
+                           ↓
+                 Discover / identify
+                      devices
+                           |
+                           ↓
+                 Dynamic Address
+                    Assignment
+                           |
+                           ↓
+                  Normal operation
+
+The Controller obtains relevant device information and assigns Dynamic Addresses to participating I3C Targets.
+
+Device information such as PID, BCR and DCR is important during this process.
+
+The important point is that Dynamic Address Assignment is not merely an alternative way of assigning addresses.
+
+It is part of the overall I3C bus initialization and device-management architecture.
+
+⸻
+
+6. Hot-Join
+
+Now consider a different situation.
+
+The bus has already been initialized:
+
+Controller
+    |
+Target A
+    |
+Target B
+
+Later, another I3C device becomes available:
+
+Controller
+    |
+Target A
+    |
+Target B
+    |
+New Target
+
+The new device cannot simply start transmitting arbitrary information onto the bus.
+
+I3C provides Hot-Join for this situation.
+
+The device uses the defined Hot-Join mechanism to request the Controller’s attention.
+
+The Controller can then perform the appropriate configuration and address-assignment operations.
+
+So:
+
+Normal initialization:
+Power-up
+   ↓
+Bus initialization
+   ↓
+DAA
+   ↓
+Normal operation
+Hot-Join:
+Bus already running
+   ↓
+New device appears
+   ↓
+Hot-Join request
+   ↓
+Controller handles device
+   ↓
+Device configuration / DAA
+
+The important difference is that Hot-Join happens after the normal bus initialization process.
+
+⸻
+
+7. In-Band Interrupt — IBI
+
+Another major I3C improvement is In-Band Interrupt.
+
+In a traditional system, a sensor might require a separate interrupt GPIO:
+
+Sensor
+   |
+   | INT GPIO
+   ↓
+Controller
+
+If you have many sensors, this can require many GPIOs.
+
+I3C allows a Target to request the Controller’s attention using the I3C bus itself:
+
+Sensor
+   |
+   | IBI
+   ↓
+I3C Bus
+   |
+   ↓
+Controller
+
+This is called In-Band Interrupt, or IBI.
+
+IBI is therefore a Target-initiated request.
+
+This is an important difference from a normal private transfer, where the Controller initiates the communication.
+
+For example:
+
+Private Transfer:
+Controller ─────────→ Target
+IBI:
+Target ─────────────→ Controller
+        "Attention!"
+
+If multiple Targets want to generate an IBI at approximately the same time, the protocol needs a way to determine which request gets bus access.
+
+Therefore, IBI is tied to the I3C arbitration mechanism.
+
+⸻
+
+8. Multiple Controllers
+
+I3C also supports Devices that have Controller capability.
+
+However, there is an important rule:
+
+Only one Controller is Active on the bus at a time.
+
+For example:
+
+Device A → Controller-capable
+Device B → Controller-capable
+Device C → Target
+
+Initially:
+
+Device A → Active Controller
+Device B → Secondary Controller capability / Target role
+Device C → Target
+
+Later, the Controller role can be transferred through the defined mechanisms:
+
+Device A → Target
+Device B → Active Controller
+Device C → Target
+
+This is why we must distinguish:
+
+Controller capability
+
+from
+
+Active Controller role
+
+A device can have the capability to become a Controller without currently controlling the bus.
+
+This becomes especially important in systems where different processing elements or subsystems may need to control the same I3C bus.
+
+⸻
+
+9. Timing Control
+
+The full MIPI I3C specification contains additional mechanisms for Timing Control.
+
+However, because we are specifically studying I3C Basic v1.1.1, we need to distinguish the functionality included in I3C Basic from functionality defined in the full I3C specification.
+
+The advanced Synchronous and Asynchronous Time Control mechanisms are not part of I3C Basic v1.1.1.
+
+Therefore, when presenting this section, we should not accidentally describe every full-I3C Timing Control feature as an I3C Basic feature.
+
+This is an important distinction whenever we use the full I3C specification as a reference.
+
+⸻
+
+10. Common Command Codes — CCC
+
+CCC is another fundamental part of SDR.
+
+Think of two different kinds of communication:
+
+Private Transfer:
+"Controller → Sensor:
+Give me your temperature."
+CCC:
+"Controller → Device:
+Tell me your device characteristics."
+"Controller → Device:
+Assign this Dynamic Address."
+"Controller → Device:
+Enable this event."
+
+Private transfers are normally associated with the device’s application-level functionality.
+
+CCC provides standardized I3C bus/device-management commands.
+
+CCC can be:
+
+CCC
+ |
+ +---- Broadcast
+ |
+ +---- Directed
+
+Broadcast CCC is intended for multiple/all applicable Targets.
+
+Directed CCC is intended for a particular Target.
+
+Examples of CCC functionality include:
+
+* Dynamic Address Assignment
+* Reading PID
+* Reading BCR
+* Reading DCR
+* Setting/changing addresses
+* Enabling/disabling events
+* Bus/device management
+
+This is why CCC can be thought of as the management/control interface of I3C.
+
+⸻
+
+11. Error Detection and Recovery
+
+A real communication bus cannot assume that everything always works correctly.
+
+For example:
+
+Controller expects:
+     Data
+      ↓
+Target responds
+But instead:
+     Unexpected bus condition
+
+I3C therefore defines mechanisms for detecting and recovering from protocol errors.
+
+For SDR, the specification defines:
+
+Target Errors:
+TE0 – TE6
+Controller Errors:
+CE0 – CE3
+
+These error categories allow an implementation to identify the type of protocol problem rather than treating every failure as simply “transaction failed.”
+
+This is particularly relevant from a firmware perspective.
+
+A Controller driver can use the defined error information to determine:
+
+* What went wrong?
+* Was the Target responsible?
+* Was the Controller responsible?
+* Is the current transaction recoverable?
+* Does the bus need recovery?
+* Does the Target need to be reset?
+
+This makes I3C much more robust for complex systems.
+
+⸻
+
+12. Target Reset
+
+The final part of 5.1 is Target Reset.
+
+Normally, resetting a peripheral might require a separate hardware reset GPIO:
+
+Controller
+    |
+    +------ RESET GPIO ------> Target
+
+I3C provides a standardized in-band mechanism instead.
+
+The Controller can configure the desired reset action using the RSTACT CCC.
+
+The Target can then recognize the defined Target Reset Pattern and perform the configured reset action.
+
+Conceptually:
+
+Controller
+    |
+    | RSTACT
+    ↓
+Target reset behavior configured
+    |
+    ↓
+Target Reset Pattern
+    |
+    ↓
+Target performs configured action
+
+Depending on the configured behavior, this can support different reset-related actions.
+
+This is another example of the overall I3C philosophy:
+
+Provide more system-management functionality through the existing two-wire bus instead of requiring additional sideband signals.
+
+⸻
+
+13. Complete Mental Model of 5.1
+
+The entire Section 5.1 can therefore be understood as one flow:
+
+                         I3C SDR
+                            |
+                            ↓
+                    Bus Configuration
+                            |
+                            ↓
+                    Bus Initialization
+                            |
+                            ↓
+               Dynamic Address Assignment
+                            |
+                            ↓
+                  Normal Bus Operation
+                            |
+          +-----------------+-----------------+
+          |                 |                 |
+      Private            CCC               IBI
+      Transfer         Management        Target Request
+          |                 |
+       Read/Write      Broadcast/
+                       Directed
+          |
+          +-----------------+
+                            |
+                     Bus Conditions
+                            |
+                     START / STOP /
+                    Repeated START
+                            |
+          +-----------------+----------------+
+          |                                  |
+       Hot-Join                       Multiple Controllers
+          |                                  |
+          +----------------+-----------------+
+                           |
+                     Error Recovery
+                           |
+                      Target Reset
+
+The best way to remember Section 5.1 is therefore:
+
+SDR is the foundation of the I3C Bus.
+
+It provides not only normal data transfer, but also the mechanisms required to configure the bus, discover and address devices, manage devices, handle Target requests, support multiple Controller-capable devices, recover from errors, and reset Targets.
+
+Once this complete SDR architecture is understood, the later sections become much easier:
+
+5.1 SDR
+   ↓
+Fundamental I3C operation
+   ↓
+5.2 HDR
+   ↓
+Higher-performance transfer mechanisms
+   ↓
+5.3 Multi-Lane
+   ↓
+Higher-bandwidth multi-lane operation
+
+The most important distinction to retain is:
+
+SDR is the foundation and default operating mode of I3C; HDR is an additional high-data-rate mode entered from the SDR-based bus operation.
