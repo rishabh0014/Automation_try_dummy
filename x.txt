@@ -1,1192 +1,1171 @@
-5.1 Single Data Rate (SDR) Mode
+5.2 High Data Rate (HDR) Modes
 
-Single Data Rate (SDR) Mode is the default and fundamental communication mode of the I3C Bus.
+I3C defines High Data Rate (HDR) modes to provide higher data-transfer efficiency than SDR while maintaining compatibility with the I3C bus architecture.
 
-The I3C Bus is initialized and configured in SDR Mode. Other I3C Modes, such as HDR, are entered from SDR using the mechanisms defined by the specification.
+The I3C Bus is always initialized and configured in SDR Mode. HDR operation is entered from SDR using the defined HDR Entry procedure.
 
-SDR is based on the I²C protocol but introduces several important enhancements and variations required for I3C operation.
+I3C Basic v1.1.1 includes the following HDR modes:
 
-The SDR section defines the fundamental mechanisms required for operating an I3C Bus, including:
+* HDR-DDR — HDR Double Data Rate
+* HDR-BT — HDR Bulk Transport
 
-* Bus configuration
-* SDR bus communication
-* Bus conditions
-* Bus initialization
-* Dynamic Address Assignment
-* Hot-Join
-* In-Band Interrupt (IBI)
-* Multiple Controllers
-* Timing Control
-* Common Command Codes (CCC)
-* SDR error detection and recovery
-* Target Reset
+The following HDR modes are defined in the full I3C specification but are not included in I3C Basic:
 
-⸻
+* HDR-TSP — HDR Ternary Symbol Pure Bus
+* HDR-TSL — HDR Ternary Symbol Legacy-inclusive Bus
 
-5.1.1 Bus Configuration
+5.2.1 HDR Entry
 
-The I3C Bus can connect multiple I3C Devices and, where supported, Legacy I²C Devices.
+HDR Entry provides the transition from SDR operation into a selected HDR mode.
 
-The specification defines multiple roles for devices participating in an I3C Bus.
-
-An I3C Device may have Controller capability, Target capability, or both.
-
-A Controller-capable Device can operate as the Primary Controller or Secondary Controller, while Target-capable devices can operate as I3C Targets.
-
-The Primary Controller is the Controller responsible for initially configuring the bus.
-
-A Secondary Controller is capable of becoming the Active Controller at a later time.
-
-The specification also allows devices to expose multiple roles or functions, including virtual targets in applicable implementations.
-
-During bus initialization, the Primary Controller obtains the required characteristics of the devices on the bus and assigns Dynamic Addresses to devices that require them.
-
-The enabled capabilities of I3C Devices are described through their Characteristics Registers.
-
-Important characteristics include:
-
-* BCR — Bus Characteristics Register
-* DCR — Device Characteristics Register
-* LVR — Legacy Virtual Register, where applicable
-
-The specification also defines different I3C bus configurations depending on whether Legacy I²C Devices are present.
-
-Bus configurations
-
-A bus may be:
-
-1. Pure Bus
-    Only I3C Devices are present.
-2. Mixed Fast Bus
-    I3C Devices and compatible Legacy I²C Devices are present.
-3. Mixed Slow/Limited Bus
-    I3C Devices and Legacy I²C Devices are present, but the Legacy I²C Devices impose additional limitations on bus operation.
-
-The exact electrical and protocol requirements for these configurations are defined by the specification.
-
-⸻
-
-5.1.2 Bus Communication
-
-SDR is based on the I²C protocol but introduces I3C-specific variations.
-
-The basic communication mechanism uses:
-
-* START
-* Address Header
-* Data
-* STOP
-
-I3C START and STOP signaling is similar to I²C, although I3C timing requirements differ.
-
-An SDR transaction generally consists of an Address Header followed by one or more Data Words.
-
-The Address Header identifies the intended Target or indicates a special operation.
-
-I3C SDR supports:
-
-* Private Write
-* Private Read
-* Broadcast communication
-* Directed communication
-* Common Command Code communication
-* Target-initiated requests such as IBI
-
-Address Header
-
-The Address Header contains the address information and transfer direction.
-
-The address used during normal I3C communication is generally the Target’s Dynamic Address.
-
-Special address values and address-header patterns are also used for protocol mechanisms such as Broadcast CCCs and Target-initiated requests.
-
-SDR Data Word
-
-An SDR Data Word consists of an 8-bit data field together with an additional protocol bit.
-
-The meaning of this additional bit depends on the type and direction of the transfer.
-
-Therefore, I3C SDR should not be treated as simply:
-
-8-bit I²C byte + I²C ACK
-
-The detailed meaning of the ninth bit and the associated acknowledgment/termination behavior are defined by the specific SDR transaction.
-
-Private Transfers
-
-A private transfer is communication between the Controller and a particular Target.
-
-It can be:
-
-* Controller Write
-* Controller Read
-
-Private transfers are normally used by the system-level application protocol to access the Target’s registers, data, configuration, or other functionality.
-
-Broadcast and Directed Messages
-
-I3C provides standardized messages that can be sent:
-
-* Broadcast — to applicable Targets on the bus
-* Directed — to a specific Target
-
-The standardized management mechanism for these messages is CCC.
-
-⸻
-
-5.1.3 Bus Conditions
-
-The I3C protocol defines specific bus conditions used to control the beginning, continuation, and termination of communication.
-
-Important bus conditions include:
-
-* START
-* STOP
-* Repeated START
-* Bus Free condition
-* Bus Available condition
-* Other protocol-specific conditions required for arbitration and transfer control
-
-START
-
-A START condition indicates the beginning of a bus transaction.
-
-STOP
-
-A STOP condition indicates the end of a transaction and releases the bus for subsequent activity.
-
-Repeated START
-
-A Repeated START allows the Controller to begin another transaction without first releasing the bus through a STOP condition.
-
-This is particularly useful when a Controller needs to change transaction direction or perform a sequence of related operations while maintaining control of the bus.
-
-The exact electrical timing and signaling requirements are defined in the I3C electrical and protocol specifications.
-
-⸻
-
-5.1.4 Bus Initialization and Dynamic Address Assignment Mode
-
-The Primary Controller is responsible for initializing the I3C Bus.
-
-During initialization, the Primary Controller establishes the configuration required for communication with the Devices on the bus.
-
-A major part of initialization is Dynamic Address Assignment (DAA).
-
-The purpose of Dynamic Address Assignment is to provide I3C Devices with Dynamic Addresses that can be used during normal communication.
-
-The Primary Controller obtains device information and assigns addresses to Devices participating in the I3C Bus.
-
-Device identification and characteristics are associated with information such as:
-
-* PID
-* BCR
-* DCR
-
-The Dynamic Address Assignment procedure allows multiple devices to participate in address arbitration so that each device can receive an appropriate Dynamic Address.
-
-The specification also defines mechanisms for assigning addresses to devices that have Static Addresses and for handling devices that join or rejoin the bus.
-
-Dynamic Address Assignment is not merely an addressing convenience. It is part of the overall I3C bus initialization and device-management architecture.
-
-⸻
-
-5.1.5 Hot-Join Mechanism
-
-Hot-Join allows an I3C Device to request participation in an I3C Bus after the bus has already been initialized.
-
-A Target that has not been configured as part of the existing bus can issue a Hot-Join request.
-
-The Controller detects the request and can subsequently perform the necessary bus-management operations, including Dynamic Address Assignment.
+The Controller initiates the HDR Entry procedure using the defined SDR/CCC mechanism. The selected HDR mode is then used for the subsequent HDR transfer.
 
 Conceptually:
 
-Bus already running
-        |
-        v
-New I3C Device appears
-        |
-        v
-Hot-Join Request
-        |
-        v
-Controller responds
-        |
-        v
-Device configuration / DAA
-        |
-        v
-Device becomes an active participant
+SDR
+ │
+ │ HDR Entry
+ ▼
+HDR Mode
+ │
+ │ HDR Exit / HDR Restart
+ ▼
+SDR or next HDR transfer
 
-Hot-Join is therefore different from normal bus initialization.
+HDR Entry is important because the bus must explicitly distinguish HDR communication from normal SDR communication.
 
 ⸻
 
-5.1.6 In-Band Interrupt (IBI)
+5.2.2 HDR Double Data Rate (HDR-DDR)
 
-In-Band Interrupt allows an I3C Target to request the attention of the Controller using the I3C Bus itself.
+HDR-DDR is an HDR mode that uses the same general two-wire signaling concept as SDR but transfers information on both clock edges.
 
-Instead of requiring a separate interrupt wire for each Target:
+The fundamental idea is:
 
-Target ---- GPIO ----> Controller
+SDR:
+       ┌───┐   ┌───┐
+SCL ___│   │___│   │___
+          ↑
+       data
+HDR-DDR:
+       ┌───┐   ┌───┐
+SCL ___│   │___│   │___
+       ↑ ↓   ↑ ↓
+       data  data
 
-the Target can use the I3C bus:
+Therefore, HDR-DDR can transfer approximately twice the amount of data per clock cycle compared with a comparable single-edge transfer.
 
-Target
-   |
-   | IBI
-   v
-I3C Bus
-   |
-   v
-Controller
+HDR-DDR Preamble
 
-An IBI request is arbitrated using the I3C protocol.
+HDR-DDR uses defined Preamble bits to identify the type of HDR-DDR word and to support protocol control.
 
-Dynamic Addresses provide priority information during IBI arbitration.
+The Preamble is particularly important for:
 
-A Target may optionally provide additional information as part of its IBI.
+* identifying HDR-DDR word types,
+* distinguishing Command and Data Words,
+* supporting flow-control behavior,
+* detecting Target responses such as NACK where supported.
 
-IBI can therefore be used for events such as:
+HDR-DDR Word
 
-* New sensor data
-* Status changes
-* Device events
-* Attention requests
+HDR-DDR communication is organized into defined Words.
 
-IBI is a Target-initiated bus request, rather than a normal Controller-initiated private transaction.
+The protocol defines different word types for:
 
-⸻
+* Commands,
+* Data,
+* Reserved/protocol purposes.
 
-5.1.7 I3C Bus with Multiple Controllers
+The Controller first establishes the HDR-DDR command context and then transfers the associated data.
 
-I3C supports multiple Controller-capable Devices.
+HDR-DDR Commands
 
-However, only one Controller is Active at a time.
+HDR-DDR commands identify the operation being performed and the addressed Target.
 
-The Controller that initially configures the bus is the Primary Controller.
+The command space contains separate read/write operations and supports the required I3C communication functions.
 
-Another Controller-capable Device can operate as a Secondary Controller.
+The basic flow is:
 
-The Secondary Controller can initially behave as a Target and can later become the Active Controller through the defined Controller handoff mechanisms.
+HDR Entry
+   ↓
+HDR-DDR Command
+   ↓
+Command accepted / ignored / NACK
+   ↓
+Data Words
+   ↓
+CRC Word
+   ↓
+HDR Restart or HDR Exit
 
-Conceptually:
+CCCs in HDR-DDR
 
-Initial:
-Device A → Primary / Active Controller
-Device B → Secondary Controller capability + Target role
-After Controller Handoff:
-Device A → Target
-Device B → Active Controller
+I3C also allows defined CCC operations to be performed in HDR modes.
 
-This allows systems to change which device controls the bus without physically changing the bus wiring.
+HDR-DDR therefore provides a mechanism for transferring appropriate CCC information using HDR-DDR protocol formatting.
 
-The specification defines the required procedures for Controller-role handoff and coordination between Controller-capable Devices.
+Not every CCC is permitted in every HDR mode. The Controller and Target capabilities and the defined CCC restrictions must be followed.
 
-⸻
+HDR-DDR Flow Control
 
-5.1.8 Timing Control
+I3C Basic v1.1.1 defines additional flow-control mechanisms for HDR-DDR.
 
-The full I3C specification defines advanced Timing Control capabilities.
+For example, a Target can be configured to use an ACK/NACK mechanism for certain HDR-DDR Write commands.
 
-These include mechanisms for synchronizing or correlating timing information between Devices.
+This capability is configured using the ENDXFER CCC.
 
-However, it is important to distinguish full I3C from I3C Basic v1.1.1.
+The default behavior is important: the additional HDR-DDR Write ACK/NACK capability is disabled by default and must be appropriately configured before it is used.
 
-I3C Basic v1.1.1 excludes the full Timing Control functionality identified in the specification, including:
+HDR-DDR also defines procedures for:
 
-* Synchronous Time Control
-* Asynchronous Time Control Modes 1–3
+* Controller-to-Target Write termination,
+* Target-to-Controller Read termination,
+* early transfer termination,
+* continuing or ending a transfer.
 
-Therefore, these features should not be presented as mandatory/available I3C Basic v1.1.1 functionality.
+HDR-DDR CRC
 
-For I3C Basic, the normal SDR/HDR timing requirements remain defined by the applicable electrical and timing specifications.
+HDR-DDR uses a CRC-5 mechanism for error detection.
 
-⸻
+The CRC Word is transmitted using the defined HDR-DDR CRC format.
 
-5.1.9 Common Command Codes (CCC)
+The receiver uses the CRC information to detect errors in the HDR-DDR transfer.
 
-Common Command Codes provide standardized commands for managing I3C Devices and the I3C Bus.
+HDR-DDR Transfer Termination
 
-CCC commands are divided broadly into:
+An HDR-DDR transfer can finish normally or can be terminated according to the defined flow-control procedure.
 
-* Broadcast CCC
-* Directed CCC
+After the transfer, the Controller can:
 
-Broadcast CCC
-
-A Broadcast CCC is intended for all applicable I3C Targets on the bus.
-
-Examples include commands used for common bus-wide configuration and management.
-
-Directed CCC
-
-A Directed CCC targets a specific I3C Device.
-
-The Controller selects the Target using its Dynamic Address.
-
-CCC commands are used for functions including:
-
-* Device discovery
-* Device identification
-* Dynamic Address management
-* Device configuration
-* Event management
-* Bus management
-* Status/configuration operations
-
-Examples of important CCCs include:
-
-* ENTDAA — Enter Dynamic Address Assignment
-* SETDASA — Set Dynamic Address from Static Address
-* SETAASA — Set All Addresses from Static Addresses
-* SETNEWDA — Set New Dynamic Address
-* GETPID — Get Provisional ID
-* GETBCR — Get Bus Characteristics Register
-* GETDCR — Get Device Characteristics Register
-* ENEC — Enable Events
-* DISEC — Disable Events
-* RSTDAA — Reset Dynamic Address Assignment
-
-CCC therefore forms a standardized bus/device management interface.
+* continue with another HDR transfer using an HDR Restart Pattern, or
+* leave HDR operation using an HDR Exit Pattern.
 
 ⸻
 
-5.1.10 Error Detection and Recovery Methods for SDR
+5.2.3 HDR Ternary Modes
 
-I3C defines mechanisms for detecting and recovering from protocol errors.
+The full I3C specification defines two HDR Ternary modes:
 
-For SDR operation, the specification defines:
+* HDR-TSP — HDR Ternary Symbol Pure Bus
+* HDR-TSL — HDR Ternary Symbol Legacy-inclusive Bus
 
-* Target Error Types
-* Controller Error Types
-* Corresponding detection mechanisms
-* Recommended/defined recovery behavior
+These modes use ternary-symbol encoding and provide additional HDR capabilities.
 
-The v1.1.1 specification defines seven Target error types:
+However:
 
-TE0
-TE1
-TE2
-TE3
-TE4
-TE5
-TE6
+HDR-TSP and HDR-TSL are NOT included in I3C Basic v1.1.1.
 
-and four Controller error types:
+Therefore, an I3C Basic implementation does not need to implement these modes.
 
-CE0
-CE1
-CE2
-CE3
-
-These mechanisms address situations such as:
-
-* Unexpected termination
-* Incorrect protocol behavior
-* Bus conditions inconsistent with the expected transaction
-* Controller/Target communication failures
-* Stuck-bus situations
-
-The specification also defines recovery mechanisms for conditions such as Controller crashes, unexpected reset, and SDA-related stuck conditions.
-
-Error handling is an important part of I3C because a shared bus must be capable of recovering without necessarily requiring a complete system reset.
+For this Wiki, these modes are included only to show the complete Section 5.2 structure of the I3C specification.
 
 ⸻
 
-5.1.11 Target Reset
+5.2.4 HDR Bulk Transport (HDR-BT)
 
-I3C provides a standardized Target Reset mechanism that allows the Controller to request reset-related actions from a Target without requiring an additional physical reset wire.
+HDR-BT is the high-throughput HDR mode included in I3C Basic.
 
-The mechanism uses:
+It uses a Clock-and-Data transmission model and can operate using:
 
-* RSTACT CCC
-* Target Reset Pattern
+* Single Lane,
+* Dual Lane,
+* Quad Lane.
 
-RSTACT configures the reset action that a Target should perform when it subsequently detects the Target Reset Pattern.
+HDR-BT combines high-speed transfer with Multi-Lane operation to provide substantially higher throughput than SDR.
 
-Depending on the configured action, Target Reset can be used for different levels of reset, including:
+MIPI describes HDR-BT as providing the highest throughput among the I3C modes included in I3C Basic. (MIPI Alliance)
 
-* Peripheral reset
-* Full/Chip reset
-* Wake-from-deep-sleep behavior
+HDR-BT Data Organization
 
-The Target Reset mechanism therefore provides a standardized in-band mechanism for controlling Target reset behavior.
+HDR-BT communication is organized into structured protocol elements rather than simply transmitting individual SDR-style bytes.
+
+The major HDR-BT structures are:
+
+HDR-BT Transfer
+      │
+      ├── Header Block
+      │
+      ├── Data Block(s)
+      │
+      └── CRC Block
+
+Header Block
+
+The Header Block provides the information required to establish and control the HDR-BT transfer.
+
+It contains command/control information required to identify the type and direction of the transfer and to establish the transfer context.
+
+Data Blocks
+
+HDR-BT transfers data in Data Blocks.
+
+A Data Block contains up to 32 data bytes in the v1.1.1 protocol.
+
+For large transfers, multiple Data Blocks can be transmitted sequentially.
+
+Header
+   ↓
+Data Block 1
+   ↓
+Data Block 2
+   ↓
+Data Block 3
+   ↓
+...
+   ↓
+CRC Block
+
+The final Data Block may contain fewer than 32 meaningful data bytes.
+
+CRC Block
+
+HDR-BT provides CRC-based error detection.
+
+The HDR-BT protocol defines CRC-16 and CRC-32 mechanisms depending on the transfer/protocol requirements.
+
+The CRC Block allows the receiver to verify the integrity of the transmitted HDR-BT data.
+
+Transition Bytes
+
+HDR-BT uses defined Transition, Transition_Control, and Transition_Verify information to manage transitions between portions of the transfer.
+
+These transition mechanisms are particularly important for:
+
+* flow control,
+* transmitter/receiver handoff,
+* determining whether the transfer should continue,
+* handling CRC results,
+* coordinating Controller and Target behavior.
+
+Data Block Delay
+
+HDR-BT defines a Data Block Delay mechanism.
+
+This allows a Target performing an HDR-BT Read to delay sending the next Data Block when it has not yet prepared enough data.
+
+This is different from normal SDR SCL clock stalling.
+
+In particular:
+
+HDR-BT Data Block Delay should not be interpreted as ordinary SCL clock stretching.
+
+The v1.1.1 specification clarified and renamed this mechanism from the earlier “Stall (delay)” terminology to Data Block Delay. (MIPI Alliance)
+
+Multi-Lane HDR-BT
+
+HDR-BT can use multiple physical data lanes:
+
+Single Lane:
+SCL + SDA
+Dual Lane:
+SCL + SDA[1:0]
+Quad Lane:
+SCL + SDA[3:0]
+
+Using additional data lanes increases the amount of data transferred per clock period.
+
+I3C Basic v1.1.1 specifically includes Multi-Lane support for HDR-BT. Multi-Lane support for SDR and HDR-TSP is not included in I3C Basic. (Scribd)
+
+HDR-BT Flow Control
+
+HDR-BT uses the Transition information to coordinate flow between the Controller and Target.
+
+Depending on the transfer, the protocol can indicate:
+
+* continue transmission,
+* terminate the transfer,
+* transition between transmitter and receiver,
+* handle CRC verification,
+* delay the next Data Block.
+
+HDR-BT Read
+
+During an HDR-BT Read, the Target provides the requested data.
+
+In specific HDR-BT Read situations, the Target can also provide the clock. Outside the defined cases, a Target is not permitted to drive SCL. (MIPI Alliance)
+
+HDR-BT Error Detection
+
+HDR-BT uses CRC and protocol-level checking to detect transfer errors.
+
+The v1.1.1 specification contains detailed definitions for:
+
+* Header parity,
+* CRC-16,
+* CRC-32,
+* CRC calculation,
+* CRC Block handling,
+* Transition_Verify,
+* transmitter/receiver handoff.
+
+These details were specifically clarified in I3C v1.1.1. (MIPI Alliance)
 
 ⸻
 
-5.1 Overall SDR Architecture
-
-The complete SDR portion can be viewed as:
-
-                         SDR MODE
-                            |
-       +--------------------+--------------------+
-       |                    |                    |
- Bus Configuration    Bus Communication    Bus Conditions
-       |                    |                    |
-       |              +-----+-----+              |
-       |              |           |              |
-       |           Private       CCC             |
-       |           Transfers                      |
-       |                                           |
-       +-------------------+-----------------------+
-                           |
-                    Bus Initialization
-                           |
-                  Dynamic Address Assignment
-                           |
-          +----------------+----------------+
-          |                                 |
-       Hot-Join                            IBI
-          |                                 |
-          +----------------+----------------+
-                           |
-                  Multiple Controllers
-                           |
-                      Timing Control
-                           |
-                    Error Detection
-                           |
-                     Target Reset
-
-SDR is therefore much more than the basic Controller-to-Target data transfer. It provides the foundation for bus configuration, addressing, device management, Target-initiated requests, multi-Controller operation, error recovery, and reset management.
-
-Now we are entering the main protocol part of the MIPI I3C Basic specification.
-
-Section 5.1 is Single Data Rate, or SDR Mode.
-
-The most important thing to understand is that SDR is not just one transfer format. It is the default mode of the I3C Bus, and a large portion of the fundamental I3C protocol is defined under this section.
-
-The specification covers bus configuration, communication, bus conditions, initialization and Dynamic Address Assignment, Hot-Join, In-Band Interrupts, multiple Controllers, Timing Control, Common Command Codes, error handling, and Target Reset.
-
-So let’s go through these one by one.
-
-First is Bus Configuration.
-
-An I3C bus can contain multiple I3C Devices and, where supported, Legacy I²C Devices.
-
-An I3C Device can have Controller capability, Target capability, or both.
-
-The Controller that initially configures the bus is called the Primary Controller.
-
-A Controller-capable device that can later become the Active Controller is a Secondary Controller.
-
-One important point is that Controller capability and the current Controller role are not the same thing.
-
-A Secondary Controller can be behaving as a Target while another Controller is currently active.
-
-Next is Bus Communication.
-
-SDR is based on I²C, so the basic signaling will look familiar to anyone who knows I²C.
-
-We have START, an Address Header, Data, and STOP.
-
-But I3C SDR is not identical to I²C.
-
-There are differences in signaling, timing, addressing, data handling, and bus-management mechanisms.
-
-SDR supports normal private communication between a Controller and a Target, as well as standardized Broadcast and Directed messages.
-
-Next are Bus Conditions.
-
-These define the conditions that control how a transaction starts, continues, and ends.
-
-START begins a transaction.
-
-STOP ends it.
-
-A Repeated START allows the Controller to continue with another transaction without releasing the bus through a STOP.
-
-The next major part is Bus Initialization and Dynamic Address Assignment.
-
-When the system powers up, the Primary Controller is responsible for configuring the bus.
-
-One of the key things it needs to do is assign Dynamic Addresses to the I3C Devices.
-
-The device characteristics, including information represented through PID, BCR, and DCR, are used during device management and initialization.
-
-Once the devices have Dynamic Addresses, the Controller can address them during normal I3C operation.
-
-Now suppose a new device appears after the bus has already been initialized.
-
-That’s where Hot-Join comes in.
-
-The device can request to join the already-running I3C bus.
-
-The Controller can then perform the required configuration and address assignment.
-
-Another important feature is In-Band Interrupt, or IBI.
-
-In a traditional system, a sensor might need a separate GPIO to interrupt the host.
-
-With I3C, the Target can use the I3C bus itself to request the Controller’s attention.
-
-So instead of having a separate interrupt wire, the Target can generate an IBI request.
-
-IBI is not just an ordinary private transfer initiated by the Controller. It is a defined Target-initiated bus request, including arbitration when multiple Targets request attention.
-
-Next is Multiple Controllers.
-
-I3C allows multiple Devices to have Controller capability.
-
-But there is still only one Active Controller at a time.
-
-For example, Device A can initially be the Primary Controller while Device B is a Secondary Controller.
-
-Later, through the defined Controller handoff mechanism, Device B can become the Active Controller.
-
-So the important distinction is between Controller capability and Active Controller status.
-
-Then we have Timing Control.
-
-The full I3C specification contains advanced Timing Control functionality.
-
-However, we need to be careful because we are studying the I3C Basic specification.
-
-Some of the advanced Timing Control features of full I3C are explicitly excluded from I3C Basic v1.1.1.
-
-Next comes one of the most important mechanisms in I3C: Common Command Codes, or CCC.
-
-CCC provides standardized commands for managing the bus and devices.
-
-CCC can be Broadcast or Directed.
-
-Broadcast means the command is intended for all applicable Targets.
-
-Directed means the command is intended for a particular Target.
-
-CCC can be used for operations such as obtaining device information, assigning addresses, changing configuration, enabling or disabling events, and other bus-management operations.
-
-Then we have Error Detection and Recovery.
-
-I3C defines specific error types for both Targets and Controllers.
-
-For SDR, the specification defines Target Error Types TE0 through TE6 and Controller Error Types CE0 through CE3.
-
-The idea is that when something unexpected happens on the bus, the protocol provides mechanisms to identify the type of failure and recover the bus instead of simply assuming that communication has permanently failed.
-
-Finally, we have Target Reset.
-
-I3C provides an in-band mechanism to request reset-related actions from a Target without necessarily requiring a separate reset signal.
-
-The Controller can configure the reset action using the RSTACT CCC, and the Target Reset Pattern subsequently causes the configured reset action.
-
-So, if we look at the complete picture, Section 5.1 gives us almost everything required to understand the basic operation of an I3C bus.
-
-We start with:
-
-Bus Configuration.
-
-Then:
-
-Bus Communication.
-
-Then:
-
-Bus Conditions.
-
-Then:
-
-Initialization and Dynamic Address Assignment.
-
-And after the bus is running, we have:
-
-Hot-Join,
-
-IBI,
-
-Multiple Controllers,
-
-CCC,
-
-Error Recovery,
-
-and Target Reset.
-
-This is why SDR is so important.
-
-It is not simply the low-speed mode of I3C.
-
-It is the foundation of the I3C protocol.
-
-Once we understand 5.1, we have the foundation required to move into HDR and understand exactly what HDR is changing compared with SDR.
-
+5.2 Summary
+
+The HDR modes can be summarized as:
+
+Mode	Purpose	Included in I3C Basic?
+SDR	Normal I3C communication	Yes
+HDR-DDR	Higher data rate using both clock edges	Yes
+HDR-TSP	HDR ternary, pure bus	No
+HDR-TSL	HDR ternary with Legacy I2C support	No
+HDR-BT	High-throughput bulk transport	Yes
+
+For I3C Basic v1.1.1, the important HDR modes are therefore:
+
+             I3C HDR
+                │
+        ┌───────┴────────┐
+        │                │
+     HDR-DDR           HDR-BT
+        │                │
+   Double Data       Bulk Transport
+      Rate          + Multi-Lane
+
+The key distinction is:
+
+HDR-DDR improves throughput primarily by transferring data on both clock edges, while HDR-BT is designed for very high-throughput bulk transfers and can additionally use multiple data lanes.
 
 
 ---
-Understanding — 5.1 Single Data Rate (SDR) Mode
+Understanding Section 5.2 — High Data Rate Modes
 
-The most important thing to understand about Section 5.1 is that SDR is not merely a data-transfer format. In the MIPI I3C Basic specification, SDR is the fundamental/default operating mode of the I3C Bus, and a large portion of the basic bus functionality is defined around it.
+The easiest way to understand Section 5.2 is to first understand what problem HDR is solving.
 
-A useful way to visualize the relationship is:
+In normal I3C SDR, the bus is already considerably faster than traditional I2C. However, SDR still follows a relatively conventional clock-and-data transfer mechanism.
 
-                         I3C BUS
-                            |
-                         SDR Mode
-                            |
-       +--------------------+--------------------+
-       |                    |                    |
- Bus Configuration    Bus Communication    Bus Management
-       |                    |                    |
- Device Roles         Private Transfer          CCC
- BCR/DCR/LVR          Read / Write               |
-       |                    |             +-------+-------+
- Initialization             |             |               |
-       |                    |         Broadcast       Directed
- Dynamic Address            |
- Assignment                 |
-       |              +-----+-----+
-       |              |           |
-    Hot-Join          IBI       Normal
-                              Transfer
+For applications where a lot of data has to be transferred, simply increasing the clock frequency is not always the best solution.
 
-The reason SDR is so important is that the I3C Bus does not start by immediately performing high-speed HDR communication. The bus is initialized and configured in SDR Mode. Once the bus is appropriately configured, the Controller can continue normal SDR communication or use the defined mechanisms to enter HDR operation.
+So I3C defines HDR — High Data Rate modes.
 
-So SDR is effectively the base protocol state from which the rest of the I3C functionality is built.
+The important point is that HDR is not a replacement for SDR.
 
-⸻
+Instead:
 
-1. Bus Configuration
+SDR = normal/default I3C communication
+HDR = optional high-throughput communication
 
-The first question when creating an I3C bus is:
+The bus is still initialized and configured in SDR.
 
-What devices are connected to the bus and what can each device do?
+That means things such as Dynamic Address Assignment and the basic bus setup happen before HDR is used.
 
-An I3C bus can contain multiple I3C Devices and, where supported, Legacy I²C Devices.
+The general idea is:
 
-An I3C Device can have different capabilities.
+                    I3C Bus
+                       │
+                 Initialize
+                       │
+                       ▼
+                      SDR
+                       │
+                 HDR Entry
+                       │
+          ┌────────────┴─────────────┐
+          │                          │
+       HDR-DDR                    HDR-BT
+          │                          │
+          └────────────┬─────────────┘
+                       │
+                  HDR Exit /
+                HDR Restart
+                       │
+                       ▼
+                      SDR
 
-For example:
-
-I3C Device
-     |
-     +---- Target capability
-     |
-     +---- Controller capability
-     |
-     +---- Controller + Target capability
-
-This distinction is important.
-
-A device being Controller-capable does not mean that it is currently controlling the bus.
-
-For example:
-
-Device A → Active Controller
-Device B → Controller-capable Target
-Device C → Target
-
-Device B has the capability to become a Controller, but Device A is currently the Active Controller.
-
-This becomes important later when we study Multiple Controllers and Controller Handoff.
-
-The specification also defines device characteristics using registers such as BCR, DCR and, where applicable, LVR. These characteristics help the Controller understand what type of device it is communicating with and what capabilities it has.
+Now let’s understand each part.
 
 ⸻
 
-2. Bus Communication
+1. HDR Entry
 
-Once the bus is configured, the Controller needs to communicate with Targets.
+Imagine that the Controller is currently communicating normally in SDR.
 
-The fundamental SDR communication is intentionally similar to I²C.
+It wants to perform a high-speed transfer.
+
+It cannot simply start sending HDR-formatted data because the Targets need to know that the protocol is changing.
+
+Therefore, I3C defines an HDR Entry procedure.
+
+The Controller initiates the transition while the bus is still operating in SDR.
 
 Conceptually:
 
-START
-   ↓
-Address Header
-   ↓
-Data
-   ↓
-STOP
+SDR communication
+       ↓
+HDR Entry
+       ↓
+Selected HDR protocol
 
-This similarity is intentional because I3C needs to coexist with Legacy I²C Targets.
+This creates a clear boundary between normal SDR communication and HDR communication.
 
-However, this does not mean that I3C SDR is simply I²C running at a higher frequency.
+Once the HDR mode is active, the bus follows the rules of that HDR mode.
 
-There are important differences in:
+At the end, the Controller can leave HDR using the defined HDR Exit mechanism or continue to another HDR transfer using the appropriate HDR Restart mechanism.
 
-* Signaling
-* Timing
-* Addressing
-* Data-word handling
-* Arbitration
-* Bus management
+⸻
 
-For example, I3C uses Dynamic Addresses, whereas traditional I²C systems normally use statically configured addresses.
+2. HDR-DDR
 
-SDR supports normal Private Transfers, where the Controller communicates with a specific Target.
+HDR-DDR means:
+
+High Data Rate — Double Data Rate
+
+The important word is Double Data Rate.
+
+In a normal single-edge transfer, we can conceptually think of one data opportunity per clock cycle.
 
 For example:
 
+Clock:
+      ↑       ↑       ↑
+      │       │       │
+──────┘───────┘───────┘
+      D1      D2      D3
+
+HDR-DDR uses both edges:
+
+Clock:
+      ↑   ↓   ↑   ↓   ↑   ↓
+      │   │   │   │   │   │
+──────┘───┘───┘───┘───┘───┘
+      D1  D2  D3  D4  D5  D6
+
+So the same clock frequency can provide more data-transfer opportunities.
+
+That is the basic reason it is called Double Data Rate.
+
+MIPI’s description of HDR-DDR is that it uses essentially the same signaling approach as SDR while operating at about twice the data rate. (MIPI Alliance)
+
+⸻
+
+3. HDR-DDR is not simply “SDR twice as fast”
+
+This is an important point.
+
+HDR-DDR does not mean:
+
+“Take the SDR protocol and just double the clock.”
+
+HDR-DDR has its own protocol definition.
+
+It introduces things such as:
+
+* HDR-DDR Preamble,
+* Command Words,
+* Data Words,
+* flow-control mechanisms,
+* CRC,
+* HDR Restart Pattern,
+* HDR Exit Pattern,
+* transfer termination procedures.
+
+So from an implementation perspective, HDR-DDR is a separate protocol state/mode.
+
+Think of it as:
+
+SDR protocol
+     │
+     │ HDR Entry
+     ▼
+HDR-DDR protocol
+     │
+     ├── Command
+     ├── Data
+     ├── CRC
+     └── Termination
+
+⸻
+
+4. HDR-DDR Preamble
+
+When you’re implementing or debugging HDR-DDR, one of the first concepts to understand is the Preamble.
+
+The protocol uses Preamble bits associated with HDR-DDR Words.
+
+These bits help the receiver determine how the following word should be interpreted.
+
+For example, conceptually:
+
+Preamble
+   ↓
+"What kind of HDR-DDR word is coming?"
+   ↓
+Command / Data / CRC / protocol action
+
+The Preamble also participates in HDR-DDR flow control.
+
+This becomes particularly important for Target responses such as NACK behavior.
+
+⸻
+
+5. HDR-DDR Words
+
+HDR-DDR communication is organized into protocol Words.
+
+A Word is not simply equivalent to an SDR byte.
+
+There are different HDR-DDR Word types.
+
+The major conceptual categories are:
+
+HDR-DDR Words
+     │
+     ├── Command Word
+     ├── Data Word
+     └── CRC Word
+
+The exact bit-level structure is defined by the specification.
+
+The important thing to understand is that HDR-DDR has a structured protocol rather than just:
+
+Address → Byte → Byte → Byte
+
+⸻
+
+6. HDR-DDR Command
+
+The Controller first establishes what operation it wants to perform.
+
+For example, conceptually:
+
+HDR-DDR Command
+       │
+       ├── Target / operation information
+       │
+       ▼
+   Read or Write
+       │
+       ▼
+   Data transfer
+
+The command determines how the following Data Words are interpreted.
+
+HDR-DDR has defined command coding for Read and Write operations.
+
+⸻
+
+7. HDR-DDR Write
+
+For a Write operation:
+
 Controller
-     |
-     | Write
-     ↓
-Target A
+     │
+     │ HDR-DDR Write Command
+     ▼
+   Target
+     │
+     │ Data Words
+     ▼
+   Target
+
+The Controller sends the command and then sends the associated data.
+
+The Target processes the data according to the command.
+
+In I3C Basic v1.1.1, additional flow control was introduced for HDR-DDR Write commands.
+
+⸻
+
+8. HDR-DDR Write NACK
+
+This is an important v1.1.1 feature.
+
+Earlier HDR-DDR behavior did not provide the same kind of Target NACK mechanism for unsupported DDR Write commands.
+
+That created a situation where the Controller could send a command that the Target did not support, and the Target would simply ignore/drop the associated data.
+
+Starting with the v1.1 generation, the Controller can configure the Target to use an ACK/NACK mechanism for HDR-DDR Write commands.
+
+The configuration is performed using ENDXFER CCC.
+
+The additional ACK/NACK behavior is disabled by default.
+
+So conceptually:
+
+                 ENDXFER CCC
+                      │
+                      ▼
+          Enable HDR-DDR Write
+             ACK/NACK behavior
+                      │
+                      ▼
+              HDR-DDR Write
+                      │
+             ┌────────┴────────┐
+             │                 │
+            ACK               NACK
+             │                 │
+          Continue         Terminate/
+          transfer          recover
+
+MIPI specifically notes that HDR-DDR Targets supporting this v1.1.1 capability support the mechanism, while the capability is disabled by default. (MIPI Alliance)
+
+⸻
+
+9. HDR-DDR Read
+
+For a Read:
+
+Controller
+     │
+     │ HDR-DDR Read Command
+     ▼
+   Target
+     │
+     │ Data Words
+     ▼
+Controller
+
+The Target provides the requested data.
+
+The Controller can determine when it has received enough data and can terminate the Read according to the HDR-DDR termination procedure.
+
+Unlike the optional Write termination capability, HDR-DDR Read termination is always supported by the relevant protocol.
+
+MIPI’s FAQ explicitly notes that HDR-DDR Read transfer termination is always allowed. (MIPI Alliance)
+
+⸻
+
+10. HDR-DDR CRC
+
+HDR-DDR uses CRC-5 for error detection.
+
+The purpose is straightforward:
+
+Suppose the Controller sends:
+
+Data:
+D1 D2 D3 D4 D5
+
+If something goes wrong electrically and the Target receives:
+
+D1 D2 X3 D4 D5
+
+the receiver needs a way to detect that the transfer was corrupted.
+
+CRC provides that check.
+
+Conceptually:
+
+Data Words
+    │
+    ▼
+CRC calculation
+    │
+    ▼
+CRC Word
+    │
+    ▼
+Receiver verifies
+
+The HDR-DDR CRC Word has a defined protocol format and is transmitted using the HDR-DDR timing/word structure.
+
+⸻
+
+11. HDR-DDR Transfer Termination
+
+An HDR-DDR transfer does not necessarily have to run until some arbitrary bus STOP.
+
+HDR-DDR has explicit transfer termination mechanisms.
+
+The transfer can end because:
+
+* the expected data transfer has completed,
+* the Controller terminates a Read,
+* the Target terminates a Write when the configured capability permits it,
+* an error occurs,
+* the Controller decides to leave HDR.
+
+Afterward, the Controller can either:
+
+HDR Restart Pattern
+        ↓
+another HDR transfer
 
 or:
 
-Controller
-     |
-     | Read
-     ↓
-Target A
-
-SDR also provides the foundation for CCC operations and Target-initiated mechanisms such as IBI.
+HDR Exit Pattern
+        ↓
+return to SDR
 
 ⸻
 
-3. Why does I3C remain similar to I²C?
+12. HDR-TSP and HDR-TSL
 
-This is one of the fundamental design decisions behind I3C.
+Now we come to Section 5.2.3.
 
-Imagine an existing system containing:
+The full I3C specification defines:
 
-             I3C Controller
-                   |
-        +----------+----------+
-        |          |          |
-     I3C Target I3C Target I²C Target
+HDR-TSP
 
-Replacing every existing I²C device would be expensive and impractical.
+Ternary Symbol Pure Bus.
 
-Therefore, I3C was designed so that compatible Legacy I²C Targets can coexist on the same physical bus.
+and
 
-This is why SDR retains many concepts familiar from I²C.
+HDR-TSL
 
-However, I3C adds mechanisms that I²C does not have, such as:
+Ternary Symbol Legacy-inclusive Bus.
 
-* Dynamic Address Assignment
-* CCC
-* IBI
-* Hot-Join
-* Controller role management
-* HDR modes
+These use ternary-symbol signaling and are another way of increasing communication capability.
 
-Therefore, the correct mental model is:
+But for our I3C Basic discussion, there is one very important statement:
 
-I3C SDR is I²C-like, but it is not I²C.
+HDR-TSP → NOT in I3C Basic
+HDR-TSL → NOT in I3C Basic
+
+So don’t spend much time learning these for an I3C Basic implementation unless your specific product/device requires the full I3C specification.
 
 ⸻
 
-4. Bus Conditions
+13. HDR-BT
 
-Communication needs defined conditions for starting and stopping transactions.
+Now we reach the second major HDR mode in I3C Basic:
 
-The important concepts include:
+HDR-BT — HDR Bulk Transport
 
-* START
-* STOP
-* Repeated START
-* Bus availability/free conditions
+This is quite different from HDR-DDR.
 
-At a high level:
+HDR-DDR mainly improves the transfer rate by using both edges of the clock.
 
-START
-  ↓
-Transaction
-  ↓
-Repeated START
-  ↓
-Another transaction
-  ↓
-STOP
+HDR-BT is designed for high-throughput bulk data transfer.
 
-A START indicates that the Controller is beginning bus activity.
-
-A STOP indicates that the current transaction sequence has ended.
-
-A Repeated START allows the Controller to continue with another transaction without first issuing STOP.
-
-This is conceptually similar to I²C, but I3C defines its own timing and signaling requirements.
-
-Later, when studying the actual SDR waveform, we should look at exactly what happens to SDA and SCL for each of these conditions.
-
-⸻
-
-5. Bus Initialization and Dynamic Address Assignment
-
-This is one of the most important parts of I3C.
-
-When the system starts, the Controller cannot simply assume:
-
-Target A = 0x20
-Target B = 0x21
-Target C = 0x22
-
-Instead, I3C provides mechanisms for Dynamic Address Assignment.
+MIPI describes HDR-BT as using a Clock-and-Data model and supporting single-, dual-, and quad-lane configurations. (MIPI Alliance)
 
 Conceptually:
 
-                    Bus Initialization
-                           |
-                           ↓
-                  Primary Controller
-                           |
-                           ↓
-                 Discover / identify
-                      devices
-                           |
-                           ↓
-                 Dynamic Address
-                    Assignment
-                           |
-                           ↓
-                  Normal operation
-
-The Controller obtains relevant device information and assigns Dynamic Addresses to participating I3C Targets.
-
-Device information such as PID, BCR and DCR is important during this process.
-
-The important point is that Dynamic Address Assignment is not merely an alternative way of assigning addresses.
-
-It is part of the overall I3C bus initialization and device-management architecture.
+HDR-DDR
+    ↓
+More data per clock
+    ↓
+Double Data Rate
+HDR-BT
+    ↓
+More data per clock
++
+Multiple Data Lanes
+    ↓
+Very high throughput
 
 ⸻
 
-6. Hot-Join
+14. HDR-BT Multi-Lane
 
-Now consider a different situation.
+This is one of the most interesting parts.
 
-The bus has already been initialized:
+Normal I3C is a two-wire bus:
 
-Controller
-    |
-Target A
-    |
-Target B
+SCL
+SDA
 
-Later, another I3C device becomes available:
+HDR-BT can extend the data side:
 
-Controller
-    |
-Target A
-    |
-Target B
-    |
-New Target
+Single Lane:
+SCL
+SDA
+Dual Lane:
+SCL
+SDA0
+SDA1
+Quad Lane:
+SCL
+SDA0
+SDA1
+SDA2
+SDA3
 
-The new device cannot simply start transmitting arbitrary information onto the bus.
+The additional SDA lanes allow more bits to be transferred during the same clock period.
 
-I3C provides Hot-Join for this situation.
+This is why Multi-Lane can significantly increase throughput.
 
-The device uses the defined Hot-Join mechanism to request the Controller’s attention.
-
-The Controller can then perform the appropriate configuration and address-assignment operations.
-
-So:
-
-Normal initialization:
-Power-up
-   ↓
-Bus initialization
-   ↓
-DAA
-   ↓
-Normal operation
-Hot-Join:
-Bus already running
-   ↓
-New device appears
-   ↓
-Hot-Join request
-   ↓
-Controller handles device
-   ↓
-Device configuration / DAA
-
-The important difference is that Hot-Join happens after the normal bus initialization process.
+I3C Basic v1.1.1 includes Multi-Lane specifically for HDR-BT. (MIPI Alliance)
 
 ⸻
 
-7. In-Band Interrupt — IBI
+15. HDR-BT Structured Transfer
 
-Another major I3C improvement is In-Band Interrupt.
+HDR-BT doesn’t just send a long stream of bytes.
 
-In a traditional system, a sensor might require a separate interrupt GPIO:
+It organizes communication into structured elements.
 
-Sensor
-   |
-   | INT GPIO
-   ↓
-Controller
+The high-level structure is:
 
-If you have many sensors, this can require many GPIOs.
+HDR-BT Transfer
+       │
+       ├── Header Block
+       │
+       ├── Data Block
+       │
+       ├── Data Block
+       │
+       ├── ...
+       │
+       └── CRC Block
 
-I3C allows a Target to request the Controller’s attention using the I3C bus itself:
+This structure makes HDR-BT suitable for large transfers.
 
-Sensor
-   |
-   | IBI
-   ↓
-I3C Bus
-   |
-   ↓
-Controller
+⸻
 
-This is called In-Band Interrupt, or IBI.
+16. HDR-BT Header Block
 
-IBI is therefore a Target-initiated request.
+The Header Block establishes the context for the transfer.
 
-This is an important difference from a normal private transfer, where the Controller initiates the communication.
+It contains control information required by the HDR-BT protocol.
+
+Conceptually:
+
+Header Block
+     │
+     ├── command/control
+     ├── transfer information
+     └── protocol information
+
+The exact bit-level encoding depends on the lane configuration and the HDR-BT command/flow.
+
+The important point is:
+
+The Header tells the receiver how the following HDR-BT transfer should be interpreted.
+
+⸻
+
+17. HDR-BT Data Blocks
+
+HDR-BT organizes payload data into Data Blocks.
+
+In v1.1.1, a normal Data Block can contain 32 data bytes.
 
 For example:
 
-Private Transfer:
-Controller ─────────→ Target
-IBI:
-Target ─────────────→ Controller
-        "Attention!"
+Header
+  ↓
+Data Block 1 → 32 bytes
+  ↓
+Data Block 2 → 32 bytes
+  ↓
+Data Block 3 → 32 bytes
+  ↓
+...
+  ↓
+CRC
 
-If multiple Targets want to generate an IBI at approximately the same time, the protocol needs a way to determine which request gets bus access.
+If the transfer doesn’t end on a 32-byte boundary, the final Data Block can contain fewer meaningful bytes.
 
-Therefore, IBI is tied to the I3C arbitration mechanism.
+This block-oriented structure is one of the major differences between HDR-BT and ordinary SDR transfers.
 
 ⸻
 
-8. Multiple Controllers
+18. HDR-BT CRC Block
 
-I3C also supports Devices that have Controller capability.
+HDR-BT provides CRC-based integrity checking.
 
-However, there is an important rule:
+Depending on the protocol context, HDR-BT defines CRC-16 and CRC-32 mechanisms.
 
-Only one Controller is Active on the bus at a time.
+Conceptually:
+
+Header
+   ↓
+Data Blocks
+   ↓
+CRC Block
+   ↓
+Receiver verifies transfer
+
+If the calculated CRC does not match the transmitted CRC, the receiver knows that the transfer was corrupted.
+
+The v1.1.1 specification contains detailed rules for how the CRC is calculated and how the CRC Block is encoded. (MIPI Alliance)
+
+⸻
+
+19. HDR-BT Transition Bytes
+
+HDR-BT has another important concept: Transition Bytes.
+
+These are used to coordinate changes in the protocol state and data ownership.
+
+The important transition-related information includes:
+
+Transition
+Transition_Control
+Transition_Verify
+
+These help coordinate things such as:
+
+* continuing the transfer,
+* changing the direction/ownership of transmission,
+* flow control,
+* CRC verification,
+* Controller/Target handoff.
+
+This becomes especially important in Read transfers because the Target can provide data and, in defined situations, can also provide the clock.
+
+⸻
+
+20. HDR-BT Data Block Delay
+
+Suppose the Controller asks a Target for a large amount of data.
+
+The Target might not have the next 32-byte block ready yet.
 
 For example:
 
-Device A → Controller-capable
-Device B → Controller-capable
-Device C → Target
+Target internal system
+Data ready:
+████████████████████████████████
+32 bytes
 
-Initially:
+The Target can send that block.
 
-Device A → Active Controller
-Device B → Secondary Controller capability / Target role
-Device C → Target
+But then:
 
-Later, the Controller role can be transferred through the defined mechanisms:
-
-Device A → Target
-Device B → Active Controller
-Device C → Target
-
-This is why we must distinguish:
-
-Controller capability
-
-from
-
-Active Controller role
-
-A device can have the capability to become a Controller without currently controlling the bus.
-
-This becomes especially important in systems where different processing elements or subsystems may need to control the same I3C bus.
-
-⸻
-
-9. Timing Control
-
-The full MIPI I3C specification contains additional mechanisms for Timing Control.
-
-However, because we are specifically studying I3C Basic v1.1.1, we need to distinguish the functionality included in I3C Basic from functionality defined in the full I3C specification.
-
-The advanced Synchronous and Asynchronous Time Control mechanisms are not part of I3C Basic v1.1.1.
-
-Therefore, when presenting this section, we should not accidentally describe every full-I3C Timing Control feature as an I3C Basic feature.
-
-This is an important distinction whenever we use the full I3C specification as a reference.
-
-⸻
-
-10. Common Command Codes — CCC
-
-CCC is another fundamental part of SDR.
-
-Think of two different kinds of communication:
-
-Private Transfer:
-"Controller → Sensor:
-Give me your temperature."
-CCC:
-"Controller → Device:
-Tell me your device characteristics."
-"Controller → Device:
-Assign this Dynamic Address."
-"Controller → Device:
-Enable this event."
-
-Private transfers are normally associated with the device’s application-level functionality.
-
-CCC provides standardized I3C bus/device-management commands.
-
-CCC can be:
-
-CCC
- |
- +---- Broadcast
- |
- +---- Directed
-
-Broadcast CCC is intended for multiple/all applicable Targets.
-
-Directed CCC is intended for a particular Target.
-
-Examples of CCC functionality include:
-
-* Dynamic Address Assignment
-* Reading PID
-* Reading BCR
-* Reading DCR
-* Setting/changing addresses
-* Enabling/disabling events
-* Bus/device management
-
-This is why CCC can be thought of as the management/control interface of I3C.
-
-⸻
-
-11. Error Detection and Recovery
-
-A real communication bus cannot assume that everything always works correctly.
-
-For example:
-
-Controller expects:
-     Data
+Next 32 bytes
       ↓
-Target responds
-But instead:
-     Unexpected bus condition
+not ready yet
 
-I3C therefore defines mechanisms for detecting and recovering from protocol errors.
+HDR-BT provides a Data Block Delay mechanism for this situation.
 
-For SDR, the specification defines:
+Instead of treating this as normal SCL clock stretching, the protocol allows the Target to delay the next Data Block according to the HDR-BT flow-control mechanism.
 
-Target Errors:
-TE0 – TE6
-Controller Errors:
-CE0 – CE3
+This distinction is important:
 
-These error categories allow an implementation to identify the type of protocol problem rather than treating every failure as simply “transaction failed.”
+SDR:
+Controller may stall SCL
+        ≠
+HDR-BT:
+Data Block Delay
 
-This is particularly relevant from a firmware perspective.
-
-A Controller driver can use the defined error information to determine:
-
-* What went wrong?
-* Was the Target responsible?
-* Was the Controller responsible?
-* Is the current transaction recoverable?
-* Does the bus need recovery?
-* Does the Target need to be reset?
-
-This makes I3C much more robust for complex systems.
+MIPI explicitly clarified this distinction in v1.1.1 and renamed the earlier “Stall (delay)” mechanism to Data Block Delay. (MIPI Alliance)
 
 ⸻
 
-12. Target Reset
+21. Can the Target drive SCL in HDR-BT?
 
-The final part of 5.1 is Target Reset.
+Normally, the Controller controls the SCL signal.
 
-Normally, resetting a peripheral might require a separate hardware reset GPIO:
+There is a defined exception for certain HDR-BT Read operations.
 
-Controller
-    |
-    +------ RESET GPIO ------> Target
+When the Controller indicates that the Target should provide the clock for the Read transfer, the Target may drive SCL for that defined operation.
 
-I3C provides a standardized in-band mechanism instead.
+Outside those defined situations, the Target is not permitted to drive SCL.
 
-The Controller can configure the desired reset action using the RSTACT CCC.
+This is important because it is easy to incorrectly conclude:
 
-The Target can then recognize the defined Target Reset Pattern and perform the configured reset action.
+“HDR-BT allows Targets to clock-stretch.”
 
-Conceptually:
+That is not the correct interpretation.
 
-Controller
-    |
-    | RSTACT
-    ↓
-Target reset behavior configured
-    |
-    ↓
-Target Reset Pattern
-    |
-    ↓
-Target performs configured action
-
-Depending on the configured behavior, this can support different reset-related actions.
-
-This is another example of the overall I3C philosophy:
-
-Provide more system-management functionality through the existing two-wire bus instead of requiring additional sideband signals.
+MIPI explicitly distinguishes the permitted HDR-BT Target clock-driving case from ordinary clock stalling. (MIPI Alliance)
 
 ⸻
 
-13. Complete Mental Model of 5.1
+22. HDR-BT Error Detection
 
-The entire Section 5.1 can therefore be understood as one flow:
+HDR-BT has multiple mechanisms to detect protocol/data errors.
 
-                         I3C SDR
-                            |
-                            ↓
-                    Bus Configuration
-                            |
-                            ↓
-                    Bus Initialization
-                            |
-                            ↓
-               Dynamic Address Assignment
-                            |
-                            ↓
-                  Normal Bus Operation
-                            |
-          +-----------------+-----------------+
-          |                 |                 |
-      Private            CCC               IBI
-      Transfer         Management        Target Request
-          |                 |
-       Read/Write      Broadcast/
-                       Directed
-          |
-          +-----------------+
-                            |
-                     Bus Conditions
-                            |
-                     START / STOP /
-                    Repeated START
-                            |
-          +-----------------+----------------+
-          |                                  |
-       Hot-Join                       Multiple Controllers
-          |                                  |
-          +----------------+-----------------+
-                           |
-                     Error Recovery
-                           |
-                      Target Reset
+The important ones are:
 
-The best way to remember Section 5.1 is therefore:
+Header parity
+     +
+CRC
+     +
+Transition verification
+     +
+Protocol rules
 
-SDR is the foundation of the I3C Bus.
+The v1.1.1 specification clarified:
 
-It provides not only normal data transfer, but also the mechanisms required to configure the bus, discover and address devices, manage devices, handle Target requests, support multiple Controller-capable devices, recover from errors, and reset Targets.
+* Header parity calculation,
+* CRC-16 calculation,
+* CRC-32 calculation,
+* CRC Block behavior,
+* Transition_Verify behavior,
+* transmitter/receiver handoff.
 
-Once this complete SDR architecture is understood, the later sections become much easier:
+These clarifications are particularly important when implementing HDR-BT in firmware. (MIPI Alliance)
 
-5.1 SDR
-   ↓
-Fundamental I3C operation
-   ↓
-5.2 HDR
-   ↓
-Higher-performance transfer mechanisms
-   ↓
-5.3 Multi-Lane
-   ↓
-Higher-bandwidth multi-lane operation
+⸻
 
-The most important distinction to retain is:
+23. HDR-DDR vs HDR-BT
 
-SDR is the foundation and default operating mode of I3C; HDR is an additional high-data-rate mode entered from the SDR-based bus operation.
+This is probably the most useful comparison to remember.
+
+Feature	HDR-DDR	HDR-BT
+Main goal	Higher data rate	Very high bulk throughput
+Basic technique	Data on both clock edges	Clock-and-data + DDR + Multi-Lane
+Data organization	HDR-DDR Words	Header/Data/CRC Blocks
+Multi-Lane	Supported in full I3C context	Supported in I3C Basic
+CRC	CRC-5	CRC-16 / CRC-32
+Flow control	Preamble-based mechanisms	Transition-based mechanisms
+Large bulk transfer	Good	Designed for this
+Included in I3C Basic v1.1.1	Yes	Yes
+
+So a useful mental model is:
+
+                    HDR
+                     │
+          ┌──────────┴──────────┐
+          │                     │
+       HDR-DDR                HDR-BT
+          │                     │
+   Both clock edges       Bulk transport
+          │                     │
+     Higher rate         Multi-Lane capable
+                                │
+                         Very high throughput
+
+⸻
+
+24. Complete Section 5.2 Picture
+
+Putting everything together:
+
+                     Section 5.2
+                  High Data Rate
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+       5.2.1          5.2.2          5.2.3
+     HDR Entry       HDR-DDR       HDR-Ternary
+                                         │
+                                   TSP / TSL
+                                   NOT Basic
+                         │
+                         │
+                       5.2.4
+                      HDR-BT
+                         │
+              ┌──────────┼──────────┐
+              │          │          │
+           Header      Data       CRC
+            Block      Blocks     Block
+                         │
+                    Multi-Lane
+                  Single/Dual/Quad
+
+The key idea is:
+
+SDR is the foundation. HDR Entry moves the bus from SDR into an HDR protocol. HDR-DDR increases transfer efficiency by using both clock edges, while HDR-BT is designed for high-throughput bulk transfers and adds Multi-Lane capability.
+
+For I3C Basic v1.1.1, the HDR features you actually need to focus on are:
+
+SDR
+ │
+ ├── HDR Entry
+ │
+ ├── HDR-DDR
+ │
+ └── HDR-BT
+       ├── Single Lane
+       ├── Dual Lane
+       └── Quad Lane
+
+HDR-TSP and HDR-TSL should be treated as full-I3C-only features, not I3C Basic features.
+
+---
+Now let’s move to Section 5.2, which covers the High Data Rate, or HDR, modes of I3C.
+
+The first thing to remember is that HDR is not the default mode of the I3C bus.
+
+The bus is always initialized and configured in SDR mode. Once the Controller has configured the bus, it can use the defined HDR Entry procedure to enter one of the supported HDR modes.
+
+For I3C Basic v1.1.1, the two HDR modes that are important to us are HDR-DDR and HDR-BT.
+
+There are also two other modes called HDR-TSP and HDR-TSL in the full I3C specification, but these are not included in I3C Basic.
+
+So our focus is mainly HDR Entry, HDR-DDR, and HDR-BT.
+
+Let’s first understand HDR-DDR.
+
+DDR stands for Double Data Rate.
+
+The basic idea is that instead of transferring data using only one edge of the clock, HDR-DDR uses both edges.
+
+So, conceptually, if SDR gives us one data-transfer opportunity per clock cycle, HDR-DDR can provide two.
+
+But HDR-DDR is not simply SDR with double the clock frequency.
+
+It has its own protocol, including Preamble bits, Command Words, Data Words, flow-control procedures, CRC, and transfer termination mechanisms.
+
+The Controller first enters HDR-DDR and then sends an HDR-DDR command.
+
+Depending on whether it is a Read or Write operation, the following Data Words are transferred in the appropriate direction.
+
+HDR-DDR also has CRC-based error detection using CRC-5.
+
+Another important feature in the v1.1.1 generation is HDR-DDR Write flow control.
+
+Using the ENDXFER CCC, the Controller can configure a Target to use an ACK/NACK mechanism for HDR-DDR Write commands.
+
+This is useful because otherwise a Target that didn’t support a particular Write command could simply ignore the command and the Controller might still continue sending data.
+
+HDR-DDR also defines procedures for ending transfers.
+
+After a transfer, the Controller can either continue with another HDR transfer using an HDR Restart Pattern or leave HDR mode using an HDR Exit Pattern.
+
+Now, Section 5.2.3 describes HDR-TSP and HDR-TSL.
+
+These are HDR Ternary modes from the full I3C specification.
+
+However, they are not part of I3C Basic, so we don’t need to implement or study them in detail for an I3C Basic implementation.
+
+The last and probably most interesting HDR mode for us is HDR-BT.
+
+HDR-BT stands for HDR Bulk Transport.
+
+The purpose of HDR-BT is high-throughput bulk data transfer.
+
+Unlike HDR-DDR, which mainly improves the rate by using both clock edges, HDR-BT combines high-speed transfer with a Clock-and-Data model and Multi-Lane capability.
+
+HDR-BT can operate using a single data lane, dual data lanes, or quad data lanes.
+
+So conceptually:
+
+Single lane gives us one SDA data lane.
+
+Dual lane gives us two.
+
+And quad lane gives us four.
+
+More lanes mean that more data can be transferred during the same clock period.
+
+HDR-BT organizes the transfer into structured blocks.
+
+At a high level, we have a Header Block, followed by one or more Data Blocks, and then a CRC Block.
+
+A Data Block can contain up to 32 data bytes in the v1.1.1 protocol.
+
+For a large transfer, we can therefore have multiple Data Blocks.
+
+HDR-BT also provides CRC-based error detection, with CRC-16 and CRC-32 mechanisms defined by the protocol.
+
+Another important concept is the Transition information.
+
+HDR-BT uses Transition, Transition_Control, and Transition_Verify information to manage flow control, transfer continuation or termination, and transmitter/receiver handoff.
+
+HDR-BT also has something called Data Block Delay.
+
+Imagine that a Target is performing a Read and has already sent one 32-byte Data Block, but its internal system isn’t ready with the next block yet.
+
+HDR-BT provides a mechanism for the Target to delay the next Data Block.
+
+This should not be confused with normal SDR clock stretching. MIPI specifically clarified this distinction in v1.1.1.
+
+Also, in certain HDR-BT Read situations, the Target can provide the clock. But this is only allowed in the specific protocol-defined situation. It does not mean that a Target can freely drive SCL whenever it wants.
+
+So, if we summarize Section 5.2:
+
+SDR is the normal I3C mode.
+
+HDR Entry provides the transition from SDR into HDR.
+
+HDR-DDR improves data-transfer efficiency by transferring information on both clock edges.
+
+HDR-BT is designed for high-throughput bulk transfers and additionally supports Single, Dual, and Quad Lane configurations.
+
+And HDR-TSP and HDR-TSL are full-I3C features and are not part of I3C Basic.
+
+So the main picture to remember is:
+
+SDR → HDR Entry → HDR-DDR or HDR-BT → HDR Exit or HDR Restart.
+
+That’s the overall structure of Section 5.2.
