@@ -1,1171 +1,164 @@
-5.2 High Data Rate (HDR) Modes
+@startuml
 
-I3C defines High Data Rate (HDR) modes to provide higher data-transfer efficiency than SDR while maintaining compatibility with the I3C bus architecture.
+' ============================================================
+' RM DRAM Layout — HCore Carve-out, RM Addition & FW Mapping
+' ============================================================
 
-The I3C Bus is always initialized and configured in SDR Mode. HDR operation is entered from SDR using the defined HDR Entry procedure.
+left to right direction
 
-I3C Basic v1.1.1 includes the following HDR modes:
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam roundcorner 12
 
-* HDR-DDR — HDR Double Data Rate
-* HDR-BT — HDR Bulk Transport
+skinparam rectangle {
+    BorderColor #234B6B
+    FontColor #172B3A
+}
 
-The following HDR modes are defined in the full I3C specification but are not included in I3C Basic:
+skinparam package {
+    BorderColor #6B8FA8
+    FontColor #102A43
+    BackgroundColor white
+}
 
-* HDR-TSP — HDR Ternary Symbol Pure Bus
-* HDR-TSL — HDR Ternary Symbol Legacy-inclusive Bus
+skinparam ArrowColor #183B56
+skinparam ArrowThickness 2
 
-5.2.1 HDR Entry
+' ============================================================
+' MACROS
+' ============================================================
 
-HDR Entry provides the transition from SDR operation into a selected HDR mode.
+!procedure boxBlue($alias, $text)
+rectangle "$text" as $alias #D9EEF9
+!endprocedure
 
-The Controller initiates the HDR Entry procedure using the defined SDR/CCC mechanism. The selected HDR mode is then used for the subsequent HDR transfer.
+!procedure boxYellow($alias, $text)
+rectangle "$text" as $alias #FFF3C4
+!endprocedure
 
-Conceptually:
+!procedure boxGreen($alias, $text)
+rectangle "$text" as $alias #CDEFD8
+!endprocedure
 
-SDR
- │
- │ HDR Entry
- ▼
-HDR Mode
- │
- │ HDR Exit / HDR Restart
- ▼
-SDR or next HDR transfer
+!procedure boxRed($alias, $text)
+rectangle "$text" as $alias #F6C5C5
+!endprocedure
 
-HDR Entry is important because the bus must explicitly distinguish HDR communication from normal SDR communication.
+!procedure boxPurple($alias, $text)
+rectangle "$text" as $alias #E6D8F5
+!endprocedure
 
-⸻
+' ============================================================
+' PANEL 1
+' ============================================================
 
-5.2.2 HDR Double Data Rate (HDR-DDR)
+package "PANEL 1\nHCore Memory Layout\n(on-chip DRAM)" as P1 #E8F5FF {
 
-HDR-DDR is an HDR mode that uses the same general two-wire signaling concept as SDR but transfers information on both clock edges.
+    boxBlue(HCORE_ITCM,
+    "HCore ITCM RO\n0x00004000")
 
-The fundamental idea is:
+    boxBlue(HCORE_DTCM,
+    "HCore DTCM RW\n0x00061600")
 
-SDR:
-       ┌───┐   ┌───┐
-SCL ___│   │___│   │___
-          ↑
-       data
-HDR-DDR:
-       ┌───┐   ┌───┐
-SCL ___│   │___│   │___
-       ↑ ↓   ↑ ↓
-       data  data
+    boxYellow(HCORE_DRAM_RO,
+    "HCore DRAM RO\n0x01AE0000\n~599 KB code\n~105 KB margin")
 
-Therefore, HDR-DDR can transfer approximately twice the amount of data per clock cycle compared with a comparable single-edge transfer.
+    boxRed(CARVED,
+    "CARVED FOR RM DRAM\n0x01B90000 - 0x01B9FFFF\n64 KB tail")
 
-HDR-DDR Preamble
+    boxBlue(HCORE_DRAM_RW,
+    "HCore DRAM RW\n0x01BA0000 - 0x01BAFFFF\n64 KB")
 
-HDR-DDR uses defined Preamble bits to identify the type of HDR-DDR word and to support protocol control.
+    note right of HCORE_DRAM_RW
+    This 64 KB tail was previously
+    part of the HCore DRAM RO.
 
-The Preamble is particularly important for:
+    It is now reused as:
 
-* identifying HDR-DDR word types,
-* distinguishing Command and Data Words,
-* supporting flow-control behavior,
-* detecting Target responses such as NACK where supported.
+    LOAD_RM_DRAM
+    end note
 
-HDR-DDR Word
+    HCORE_ITCM -down-> HCORE_DTCM
+    HCORE_DTCM -down-> HCORE_DRAM_RO
+    HCORE_DRAM_RO -down-> CARVED
+    CARVED -down-> HCORE_DRAM_RW
+}
 
-HDR-DDR communication is organized into defined Words.
+' ============================================================
+' PANEL 2
+' ============================================================
 
-The protocol defines different word types for:
+package "PANEL 2\nRM Memory Layout\n(newly added DRAM)" as P2 #E8FFF8 {
 
-* Commands,
-* Data,
-* Reserved/protocol purposes.
+    boxYellow(RM_OVERFLOW,
+    "RM SRAM — OVERFLOWED\nLOAD_SRAM\n0x01600000\n52 KB")
 
-The Controller first establishes the HDR-DDR command context and then transfers the associated data.
+    boxGreen(RM_DRAM,
+    "RM DRAM RO — NEW\nLOAD_RM_DRAM\n0x01B90000\n\n0x2C18 = 11,264 B\nMax capacity = 64 KB")
 
-HDR-DDR Commands
+    rectangle "Contains:\nBootFlash\nFMC\nTE\nNSP\nUtil\nBootNCP\nBootHIPnand\nSignalIntegrity" as RM_CONTENT #DFF5E7
 
-HDR-DDR commands identify the operation being performed and the addressed Target.
+    boxPurple(MPU21,
+    "MPU Region 21\nBase = 0x01B90000\nRM_DRAM_ZI\nzero-init before C++ ctors")
 
-The command space contains separate read/write operations and supports the required I3C communication functions.
+    RM_OVERFLOW -down-> RM_DRAM
+    RM_DRAM -down-> RM_CONTENT
+    RM_CONTENT -down-> MPU21
+}
 
-The basic flow is:
+' ============================================================
+' PANEL 3
+' ============================================================
 
-HDR Entry
-   ↓
-HDR-DDR Command
-   ↓
-Command accepted / ignored / NACK
-   ↓
-Data Words
-   ↓
-CRC Word
-   ↓
-HDR Restart or HDR Exit
+package "PANEL 3\nFW Image Layout\n(FW_SECTION_IDX enum — mX)" as P3 #FFFDE6 {
 
-CCCs in HDR-DDR
+    rectangle "Unchanged indices (before insertion)\n\nm0    RM SRAM code\nm1    HCore ITCM RO\nm2    HCore DTCM RW\nm3    HCore DRAM RO" as OLD_IDX #F4F7F9
 
-I3C also allows defined CCC operations to be performed in HDR modes.
+    boxGreen(NEW_SECTION,
+    "NEW SECTION INSERTED\n\nm4   RM DRAM RO\n\nMF_RM_DRAM_RO_SECIDX")
 
-HDR-DDR therefore provides a mechanism for transferring appropriate CCC information using HDR-DDR protocol formatting.
+    rectangle "All following indices shift by +1\n\nm5    HCore DRAM RW       (was m4)\nm6    CMCore ITCM RO      (was m5)\nm7    CMCore DTCM RW      (was m6)\nm8    CMCore DRAM RO      (was m7)\nm9    NCore ITCM RO       (was m8)\nm10  NCore DTCM RW       (was m9)\nm11  NCore SRAM RO       (was m10)\nm12  NCore DRAM RO       (was m11)\nm13  NCore DRAM RW       (was m12)\nm14  FCore ITCM RO       (was m13)\nm15  FCore DTCM RW       (was m14)\nm16  FCore SRAM RO       (was m15)\nm17  FCore DRAM RO       (was m16)\nm18  FCore DRAM RW       (was m17)" as SHIFTED #F4F7F9
 
-Not every CCC is permitted in every HDR mode. The Controller and Target capabilities and the defined CCC restrictions must be followed.
+    boxYellow(TOTAL,
+    "NUM_TOTAL_SECTION\n36  →  37")
 
-HDR-DDR Flow Control
+    OLD_IDX -down-> NEW_SECTION
+    NEW_SECTION -down-> SHIFTED
+    SHIFTED -down-> TOTAL
+}
 
-I3C Basic v1.1.1 defines additional flow-control mechanisms for HDR-DDR.
+' ============================================================
+' CROSS-PANEL FLOW
+' ============================================================
 
-For example, a Target can be configured to use an ACK/NACK mechanism for certain HDR-DDR Write commands.
+HCORE_DRAM_RO -right-> RM_DRAM : 64 KB carved\nfrom HCore and reassigned\nto RM
 
-This capability is configured using the ENDXFER CCC.
+RM_DRAM -right-> NEW_SECTION : Represented by new\nFW section index
 
-The default behavior is important: the additional HDR-DDR Write ACK/NACK capability is disabled by default and must be appropriately configured before it is used.
+NEW_SECTION ..> RM_DRAM : MF_CORE_DRAM_RO_SECIDX\n        ↓\nMF_RM_DRAM_RO_SECIDX
 
-HDR-DDR also defines procedures for:
+' ============================================================
+' MPU relationship
+' ============================================================
 
-* Controller-to-Target Write termination,
-* Target-to-Controller Read termination,
-* early transfer termination,
-* continuing or ending a transfer.
+RM_DRAM ..down..> MPU21 : MPU Region 21\nprotects RM DRAM
 
-HDR-DDR CRC
+' ============================================================
+' INSERTION POINT
+' ============================================================
 
-HDR-DDR uses a CRC-5 mechanism for error detection.
+note right of NEW_SECTION
+Insertion point:
 
-The CRC Word is transmitted using the defined HDR-DDR CRC format.
-
-The receiver uses the CRC information to detect errors in the HDR-DDR transfer.
-
-HDR-DDR Transfer Termination
-
-An HDR-DDR transfer can finish normally or can be terminated according to the defined flow-control procedure.
-
-After the transfer, the Controller can:
-
-* continue with another HDR transfer using an HDR Restart Pattern, or
-* leave HDR operation using an HDR Exit Pattern.
-
-⸻
-
-5.2.3 HDR Ternary Modes
-
-The full I3C specification defines two HDR Ternary modes:
-
-* HDR-TSP — HDR Ternary Symbol Pure Bus
-* HDR-TSL — HDR Ternary Symbol Legacy-inclusive Bus
-
-These modes use ternary-symbol encoding and provide additional HDR capabilities.
-
-However:
-
-HDR-TSP and HDR-TSL are NOT included in I3C Basic v1.1.1.
-
-Therefore, an I3C Basic implementation does not need to implement these modes.
-
-For this Wiki, these modes are included only to show the complete Section 5.2 structure of the I3C specification.
-
-⸻
-
-5.2.4 HDR Bulk Transport (HDR-BT)
-
-HDR-BT is the high-throughput HDR mode included in I3C Basic.
-
-It uses a Clock-and-Data transmission model and can operate using:
-
-* Single Lane,
-* Dual Lane,
-* Quad Lane.
-
-HDR-BT combines high-speed transfer with Multi-Lane operation to provide substantially higher throughput than SDR.
-
-MIPI describes HDR-BT as providing the highest throughput among the I3C modes included in I3C Basic. (MIPI Alliance)
-
-HDR-BT Data Organization
-
-HDR-BT communication is organized into structured protocol elements rather than simply transmitting individual SDR-style bytes.
-
-The major HDR-BT structures are:
-
-HDR-BT Transfer
-      │
-      ├── Header Block
-      │
-      ├── Data Block(s)
-      │
-      └── CRC Block
-
-Header Block
-
-The Header Block provides the information required to establish and control the HDR-BT transfer.
-
-It contains command/control information required to identify the type and direction of the transfer and to establish the transfer context.
-
-Data Blocks
-
-HDR-BT transfers data in Data Blocks.
-
-A Data Block contains up to 32 data bytes in the v1.1.1 protocol.
-
-For large transfers, multiple Data Blocks can be transmitted sequentially.
-
-Header
-   ↓
-Data Block 1
-   ↓
-Data Block 2
-   ↓
-Data Block 3
-   ↓
-...
-   ↓
-CRC Block
-
-The final Data Block may contain fewer than 32 meaningful data bytes.
-
-CRC Block
-
-HDR-BT provides CRC-based error detection.
-
-The HDR-BT protocol defines CRC-16 and CRC-32 mechanisms depending on the transfer/protocol requirements.
-
-The CRC Block allows the receiver to verify the integrity of the transmitted HDR-BT data.
-
-Transition Bytes
-
-HDR-BT uses defined Transition, Transition_Control, and Transition_Verify information to manage transitions between portions of the transfer.
-
-These transition mechanisms are particularly important for:
-
-* flow control,
-* transmitter/receiver handoff,
-* determining whether the transfer should continue,
-* handling CRC results,
-* coordinating Controller and Target behavior.
-
-Data Block Delay
-
-HDR-BT defines a Data Block Delay mechanism.
-
-This allows a Target performing an HDR-BT Read to delay sending the next Data Block when it has not yet prepared enough data.
-
-This is different from normal SDR SCL clock stalling.
-
-In particular:
-
-HDR-BT Data Block Delay should not be interpreted as ordinary SCL clock stretching.
-
-The v1.1.1 specification clarified and renamed this mechanism from the earlier “Stall (delay)” terminology to Data Block Delay. (MIPI Alliance)
-
-Multi-Lane HDR-BT
-
-HDR-BT can use multiple physical data lanes:
-
-Single Lane:
-SCL + SDA
-Dual Lane:
-SCL + SDA[1:0]
-Quad Lane:
-SCL + SDA[3:0]
-
-Using additional data lanes increases the amount of data transferred per clock period.
-
-I3C Basic v1.1.1 specifically includes Multi-Lane support for HDR-BT. Multi-Lane support for SDR and HDR-TSP is not included in I3C Basic. (Scribd)
-
-HDR-BT Flow Control
-
-HDR-BT uses the Transition information to coordinate flow between the Controller and Target.
-
-Depending on the transfer, the protocol can indicate:
-
-* continue transmission,
-* terminate the transfer,
-* transition between transmitter and receiver,
-* handle CRC verification,
-* delay the next Data Block.
-
-HDR-BT Read
-
-During an HDR-BT Read, the Target provides the requested data.
-
-In specific HDR-BT Read situations, the Target can also provide the clock. Outside the defined cases, a Target is not permitted to drive SCL. (MIPI Alliance)
-
-HDR-BT Error Detection
-
-HDR-BT uses CRC and protocol-level checking to detect transfer errors.
-
-The v1.1.1 specification contains detailed definitions for:
-
-* Header parity,
-* CRC-16,
-* CRC-32,
-* CRC calculation,
-* CRC Block handling,
-* Transition_Verify,
-* transmitter/receiver handoff.
-
-These details were specifically clarified in I3C v1.1.1. (MIPI Alliance)
-
-⸻
-
-5.2 Summary
-
-The HDR modes can be summarized as:
-
-Mode	Purpose	Included in I3C Basic?
-SDR	Normal I3C communication	Yes
-HDR-DDR	Higher data rate using both clock edges	Yes
-HDR-TSP	HDR ternary, pure bus	No
-HDR-TSL	HDR ternary with Legacy I2C support	No
-HDR-BT	High-throughput bulk transport	Yes
-
-For I3C Basic v1.1.1, the important HDR modes are therefore:
-
-             I3C HDR
-                │
-        ┌───────┴────────┐
-        │                │
-     HDR-DDR           HDR-BT
-        │                │
-   Double Data       Bulk Transport
-      Rate          + Multi-Lane
-
-The key distinction is:
-
-HDR-DDR improves throughput primarily by transferring data on both clock edges, while HDR-BT is designed for very high-throughput bulk transfers and can additionally use multiple data lanes.
-
-
----
-Understanding Section 5.2 — High Data Rate Modes
-
-The easiest way to understand Section 5.2 is to first understand what problem HDR is solving.
-
-In normal I3C SDR, the bus is already considerably faster than traditional I2C. However, SDR still follows a relatively conventional clock-and-data transfer mechanism.
-
-For applications where a lot of data has to be transferred, simply increasing the clock frequency is not always the best solution.
-
-So I3C defines HDR — High Data Rate modes.
-
-The important point is that HDR is not a replacement for SDR.
-
-Instead:
-
-SDR = normal/default I3C communication
-HDR = optional high-throughput communication
-
-The bus is still initialized and configured in SDR.
-
-That means things such as Dynamic Address Assignment and the basic bus setup happen before HDR is used.
-
-The general idea is:
-
-                    I3C Bus
-                       │
-                 Initialize
-                       │
-                       ▼
-                      SDR
-                       │
-                 HDR Entry
-                       │
-          ┌────────────┴─────────────┐
-          │                          │
-       HDR-DDR                    HDR-BT
-          │                          │
-          └────────────┬─────────────┘
-                       │
-                  HDR Exit /
-                HDR Restart
-                       │
-                       ▼
-                      SDR
-
-Now let’s understand each part.
-
-⸻
-
-1. HDR Entry
-
-Imagine that the Controller is currently communicating normally in SDR.
-
-It wants to perform a high-speed transfer.
-
-It cannot simply start sending HDR-formatted data because the Targets need to know that the protocol is changing.
-
-Therefore, I3C defines an HDR Entry procedure.
-
-The Controller initiates the transition while the bus is still operating in SDR.
-
-Conceptually:
-
-SDR communication
-       ↓
-HDR Entry
-       ↓
-Selected HDR protocol
-
-This creates a clear boundary between normal SDR communication and HDR communication.
-
-Once the HDR mode is active, the bus follows the rules of that HDR mode.
-
-At the end, the Controller can leave HDR using the defined HDR Exit mechanism or continue to another HDR transfer using the appropriate HDR Restart mechanism.
-
-⸻
-
-2. HDR-DDR
-
-HDR-DDR means:
-
-High Data Rate — Double Data Rate
-
-The important word is Double Data Rate.
-
-In a normal single-edge transfer, we can conceptually think of one data opportunity per clock cycle.
-
-For example:
-
-Clock:
-      ↑       ↑       ↑
-      │       │       │
-──────┘───────┘───────┘
-      D1      D2      D3
-
-HDR-DDR uses both edges:
-
-Clock:
-      ↑   ↓   ↑   ↓   ↑   ↓
-      │   │   │   │   │   │
-──────┘───┘───┘───┘───┘───┘
-      D1  D2  D3  D4  D5  D6
-
-So the same clock frequency can provide more data-transfer opportunities.
-
-That is the basic reason it is called Double Data Rate.
-
-MIPI’s description of HDR-DDR is that it uses essentially the same signaling approach as SDR while operating at about twice the data rate. (MIPI Alliance)
-
-⸻
-
-3. HDR-DDR is not simply “SDR twice as fast”
-
-This is an important point.
-
-HDR-DDR does not mean:
-
-“Take the SDR protocol and just double the clock.”
-
-HDR-DDR has its own protocol definition.
-
-It introduces things such as:
-
-* HDR-DDR Preamble,
-* Command Words,
-* Data Words,
-* flow-control mechanisms,
-* CRC,
-* HDR Restart Pattern,
-* HDR Exit Pattern,
-* transfer termination procedures.
-
-So from an implementation perspective, HDR-DDR is a separate protocol state/mode.
-
-Think of it as:
-
-SDR protocol
-     │
-     │ HDR Entry
-     ▼
-HDR-DDR protocol
-     │
-     ├── Command
-     ├── Data
-     ├── CRC
-     └── Termination
-
-⸻
-
-4. HDR-DDR Preamble
-
-When you’re implementing or debugging HDR-DDR, one of the first concepts to understand is the Preamble.
-
-The protocol uses Preamble bits associated with HDR-DDR Words.
-
-These bits help the receiver determine how the following word should be interpreted.
-
-For example, conceptually:
-
-Preamble
-   ↓
-"What kind of HDR-DDR word is coming?"
-   ↓
-Command / Data / CRC / protocol action
-
-The Preamble also participates in HDR-DDR flow control.
-
-This becomes particularly important for Target responses such as NACK behavior.
-
-⸻
-
-5. HDR-DDR Words
-
-HDR-DDR communication is organized into protocol Words.
-
-A Word is not simply equivalent to an SDR byte.
-
-There are different HDR-DDR Word types.
-
-The major conceptual categories are:
-
-HDR-DDR Words
-     │
-     ├── Command Word
-     ├── Data Word
-     └── CRC Word
-
-The exact bit-level structure is defined by the specification.
-
-The important thing to understand is that HDR-DDR has a structured protocol rather than just:
-
-Address → Byte → Byte → Byte
-
-⸻
-
-6. HDR-DDR Command
-
-The Controller first establishes what operation it wants to perform.
-
-For example, conceptually:
-
-HDR-DDR Command
-       │
-       ├── Target / operation information
-       │
-       ▼
-   Read or Write
-       │
-       ▼
-   Data transfer
-
-The command determines how the following Data Words are interpreted.
-
-HDR-DDR has defined command coding for Read and Write operations.
-
-⸻
-
-7. HDR-DDR Write
-
-For a Write operation:
-
-Controller
-     │
-     │ HDR-DDR Write Command
-     ▼
-   Target
-     │
-     │ Data Words
-     ▼
-   Target
-
-The Controller sends the command and then sends the associated data.
-
-The Target processes the data according to the command.
-
-In I3C Basic v1.1.1, additional flow control was introduced for HDR-DDR Write commands.
-
-⸻
-
-8. HDR-DDR Write NACK
-
-This is an important v1.1.1 feature.
-
-Earlier HDR-DDR behavior did not provide the same kind of Target NACK mechanism for unsupported DDR Write commands.
-
-That created a situation where the Controller could send a command that the Target did not support, and the Target would simply ignore/drop the associated data.
-
-Starting with the v1.1 generation, the Controller can configure the Target to use an ACK/NACK mechanism for HDR-DDR Write commands.
-
-The configuration is performed using ENDXFER CCC.
-
-The additional ACK/NACK behavior is disabled by default.
-
-So conceptually:
-
-                 ENDXFER CCC
-                      │
-                      ▼
-          Enable HDR-DDR Write
-             ACK/NACK behavior
-                      │
-                      ▼
-              HDR-DDR Write
-                      │
-             ┌────────┴────────┐
-             │                 │
-            ACK               NACK
-             │                 │
-          Continue         Terminate/
-          transfer          recover
-
-MIPI specifically notes that HDR-DDR Targets supporting this v1.1.1 capability support the mechanism, while the capability is disabled by default. (MIPI Alliance)
-
-⸻
-
-9. HDR-DDR Read
-
-For a Read:
-
-Controller
-     │
-     │ HDR-DDR Read Command
-     ▼
-   Target
-     │
-     │ Data Words
-     ▼
-Controller
-
-The Target provides the requested data.
-
-The Controller can determine when it has received enough data and can terminate the Read according to the HDR-DDR termination procedure.
-
-Unlike the optional Write termination capability, HDR-DDR Read termination is always supported by the relevant protocol.
-
-MIPI’s FAQ explicitly notes that HDR-DDR Read transfer termination is always allowed. (MIPI Alliance)
-
-⸻
-
-10. HDR-DDR CRC
-
-HDR-DDR uses CRC-5 for error detection.
-
-The purpose is straightforward:
-
-Suppose the Controller sends:
-
-Data:
-D1 D2 D3 D4 D5
-
-If something goes wrong electrically and the Target receives:
-
-D1 D2 X3 D4 D5
-
-the receiver needs a way to detect that the transfer was corrupted.
-
-CRC provides that check.
-
-Conceptually:
-
-Data Words
-    │
-    ▼
-CRC calculation
-    │
-    ▼
-CRC Word
-    │
-    ▼
-Receiver verifies
-
-The HDR-DDR CRC Word has a defined protocol format and is transmitted using the HDR-DDR timing/word structure.
-
-⸻
-
-11. HDR-DDR Transfer Termination
-
-An HDR-DDR transfer does not necessarily have to run until some arbitrary bus STOP.
-
-HDR-DDR has explicit transfer termination mechanisms.
-
-The transfer can end because:
-
-* the expected data transfer has completed,
-* the Controller terminates a Read,
-* the Target terminates a Write when the configured capability permits it,
-* an error occurs,
-* the Controller decides to leave HDR.
-
-Afterward, the Controller can either:
-
-HDR Restart Pattern
+MF_HCORE_DRAM_RO_SECIDX
         ↓
-another HDR transfer
-
-or:
-
-HDR Exit Pattern
+MF_RM_DRAM_RO_SECIDX
         ↓
-return to SDR
+remaining sections
 
-⸻
+Therefore every section after
+HCore DRAM RO moves by +1.
+end note
 
-12. HDR-TSP and HDR-TSL
-
-Now we come to Section 5.2.3.
-
-The full I3C specification defines:
-
-HDR-TSP
-
-Ternary Symbol Pure Bus.
-
-and
-
-HDR-TSL
-
-Ternary Symbol Legacy-inclusive Bus.
-
-These use ternary-symbol signaling and are another way of increasing communication capability.
-
-But for our I3C Basic discussion, there is one very important statement:
-
-HDR-TSP → NOT in I3C Basic
-HDR-TSL → NOT in I3C Basic
-
-So don’t spend much time learning these for an I3C Basic implementation unless your specific product/device requires the full I3C specification.
-
-⸻
-
-13. HDR-BT
-
-Now we reach the second major HDR mode in I3C Basic:
-
-HDR-BT — HDR Bulk Transport
-
-This is quite different from HDR-DDR.
-
-HDR-DDR mainly improves the transfer rate by using both edges of the clock.
-
-HDR-BT is designed for high-throughput bulk data transfer.
-
-MIPI describes HDR-BT as using a Clock-and-Data model and supporting single-, dual-, and quad-lane configurations. (MIPI Alliance)
-
-Conceptually:
-
-HDR-DDR
-    ↓
-More data per clock
-    ↓
-Double Data Rate
-HDR-BT
-    ↓
-More data per clock
-+
-Multiple Data Lanes
-    ↓
-Very high throughput
-
-⸻
-
-14. HDR-BT Multi-Lane
-
-This is one of the most interesting parts.
-
-Normal I3C is a two-wire bus:
-
-SCL
-SDA
-
-HDR-BT can extend the data side:
-
-Single Lane:
-SCL
-SDA
-Dual Lane:
-SCL
-SDA0
-SDA1
-Quad Lane:
-SCL
-SDA0
-SDA1
-SDA2
-SDA3
-
-The additional SDA lanes allow more bits to be transferred during the same clock period.
-
-This is why Multi-Lane can significantly increase throughput.
-
-I3C Basic v1.1.1 includes Multi-Lane specifically for HDR-BT. (MIPI Alliance)
-
-⸻
-
-15. HDR-BT Structured Transfer
-
-HDR-BT doesn’t just send a long stream of bytes.
-
-It organizes communication into structured elements.
-
-The high-level structure is:
-
-HDR-BT Transfer
-       │
-       ├── Header Block
-       │
-       ├── Data Block
-       │
-       ├── Data Block
-       │
-       ├── ...
-       │
-       └── CRC Block
-
-This structure makes HDR-BT suitable for large transfers.
-
-⸻
-
-16. HDR-BT Header Block
-
-The Header Block establishes the context for the transfer.
-
-It contains control information required by the HDR-BT protocol.
-
-Conceptually:
-
-Header Block
-     │
-     ├── command/control
-     ├── transfer information
-     └── protocol information
-
-The exact bit-level encoding depends on the lane configuration and the HDR-BT command/flow.
-
-The important point is:
-
-The Header tells the receiver how the following HDR-BT transfer should be interpreted.
-
-⸻
-
-17. HDR-BT Data Blocks
-
-HDR-BT organizes payload data into Data Blocks.
-
-In v1.1.1, a normal Data Block can contain 32 data bytes.
-
-For example:
-
-Header
-  ↓
-Data Block 1 → 32 bytes
-  ↓
-Data Block 2 → 32 bytes
-  ↓
-Data Block 3 → 32 bytes
-  ↓
-...
-  ↓
-CRC
-
-If the transfer doesn’t end on a 32-byte boundary, the final Data Block can contain fewer meaningful bytes.
-
-This block-oriented structure is one of the major differences between HDR-BT and ordinary SDR transfers.
-
-⸻
-
-18. HDR-BT CRC Block
-
-HDR-BT provides CRC-based integrity checking.
-
-Depending on the protocol context, HDR-BT defines CRC-16 and CRC-32 mechanisms.
-
-Conceptually:
-
-Header
-   ↓
-Data Blocks
-   ↓
-CRC Block
-   ↓
-Receiver verifies transfer
-
-If the calculated CRC does not match the transmitted CRC, the receiver knows that the transfer was corrupted.
-
-The v1.1.1 specification contains detailed rules for how the CRC is calculated and how the CRC Block is encoded. (MIPI Alliance)
-
-⸻
-
-19. HDR-BT Transition Bytes
-
-HDR-BT has another important concept: Transition Bytes.
-
-These are used to coordinate changes in the protocol state and data ownership.
-
-The important transition-related information includes:
-
-Transition
-Transition_Control
-Transition_Verify
-
-These help coordinate things such as:
-
-* continuing the transfer,
-* changing the direction/ownership of transmission,
-* flow control,
-* CRC verification,
-* Controller/Target handoff.
-
-This becomes especially important in Read transfers because the Target can provide data and, in defined situations, can also provide the clock.
-
-⸻
-
-20. HDR-BT Data Block Delay
-
-Suppose the Controller asks a Target for a large amount of data.
-
-The Target might not have the next 32-byte block ready yet.
-
-For example:
-
-Target internal system
-Data ready:
-████████████████████████████████
-32 bytes
-
-The Target can send that block.
-
-But then:
-
-Next 32 bytes
-      ↓
-not ready yet
-
-HDR-BT provides a Data Block Delay mechanism for this situation.
-
-Instead of treating this as normal SCL clock stretching, the protocol allows the Target to delay the next Data Block according to the HDR-BT flow-control mechanism.
-
-This distinction is important:
-
-SDR:
-Controller may stall SCL
-        ≠
-HDR-BT:
-Data Block Delay
-
-MIPI explicitly clarified this distinction in v1.1.1 and renamed the earlier “Stall (delay)” mechanism to Data Block Delay. (MIPI Alliance)
-
-⸻
-
-21. Can the Target drive SCL in HDR-BT?
-
-Normally, the Controller controls the SCL signal.
-
-There is a defined exception for certain HDR-BT Read operations.
-
-When the Controller indicates that the Target should provide the clock for the Read transfer, the Target may drive SCL for that defined operation.
-
-Outside those defined situations, the Target is not permitted to drive SCL.
-
-This is important because it is easy to incorrectly conclude:
-
-“HDR-BT allows Targets to clock-stretch.”
-
-That is not the correct interpretation.
-
-MIPI explicitly distinguishes the permitted HDR-BT Target clock-driving case from ordinary clock stalling. (MIPI Alliance)
-
-⸻
-
-22. HDR-BT Error Detection
-
-HDR-BT has multiple mechanisms to detect protocol/data errors.
-
-The important ones are:
-
-Header parity
-     +
-CRC
-     +
-Transition verification
-     +
-Protocol rules
-
-The v1.1.1 specification clarified:
-
-* Header parity calculation,
-* CRC-16 calculation,
-* CRC-32 calculation,
-* CRC Block behavior,
-* Transition_Verify behavior,
-* transmitter/receiver handoff.
-
-These clarifications are particularly important when implementing HDR-BT in firmware. (MIPI Alliance)
-
-⸻
-
-23. HDR-DDR vs HDR-BT
-
-This is probably the most useful comparison to remember.
-
-Feature	HDR-DDR	HDR-BT
-Main goal	Higher data rate	Very high bulk throughput
-Basic technique	Data on both clock edges	Clock-and-data + DDR + Multi-Lane
-Data organization	HDR-DDR Words	Header/Data/CRC Blocks
-Multi-Lane	Supported in full I3C context	Supported in I3C Basic
-CRC	CRC-5	CRC-16 / CRC-32
-Flow control	Preamble-based mechanisms	Transition-based mechanisms
-Large bulk transfer	Good	Designed for this
-Included in I3C Basic v1.1.1	Yes	Yes
-
-So a useful mental model is:
-
-                    HDR
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-       HDR-DDR                HDR-BT
-          │                     │
-   Both clock edges       Bulk transport
-          │                     │
-     Higher rate         Multi-Lane capable
-                                │
-                         Very high throughput
-
-⸻
-
-24. Complete Section 5.2 Picture
-
-Putting everything together:
-
-                     Section 5.2
-                  High Data Rate
-                         │
-          ┌──────────────┼──────────────┐
-          │              │              │
-       5.2.1          5.2.2          5.2.3
-     HDR Entry       HDR-DDR       HDR-Ternary
-                                         │
-                                   TSP / TSL
-                                   NOT Basic
-                         │
-                         │
-                       5.2.4
-                      HDR-BT
-                         │
-              ┌──────────┼──────────┐
-              │          │          │
-           Header      Data       CRC
-            Block      Blocks     Block
-                         │
-                    Multi-Lane
-                  Single/Dual/Quad
-
-The key idea is:
-
-SDR is the foundation. HDR Entry moves the bus from SDR into an HDR protocol. HDR-DDR increases transfer efficiency by using both clock edges, while HDR-BT is designed for high-throughput bulk transfers and adds Multi-Lane capability.
-
-For I3C Basic v1.1.1, the HDR features you actually need to focus on are:
-
-SDR
- │
- ├── HDR Entry
- │
- ├── HDR-DDR
- │
- └── HDR-BT
-       ├── Single Lane
-       ├── Dual Lane
-       └── Quad Lane
-
-HDR-TSP and HDR-TSL should be treated as full-I3C-only features, not I3C Basic features.
-
----
-Now let’s move to Section 5.2, which covers the High Data Rate, or HDR, modes of I3C.
-
-The first thing to remember is that HDR is not the default mode of the I3C bus.
-
-The bus is always initialized and configured in SDR mode. Once the Controller has configured the bus, it can use the defined HDR Entry procedure to enter one of the supported HDR modes.
-
-For I3C Basic v1.1.1, the two HDR modes that are important to us are HDR-DDR and HDR-BT.
-
-There are also two other modes called HDR-TSP and HDR-TSL in the full I3C specification, but these are not included in I3C Basic.
-
-So our focus is mainly HDR Entry, HDR-DDR, and HDR-BT.
-
-Let’s first understand HDR-DDR.
-
-DDR stands for Double Data Rate.
-
-The basic idea is that instead of transferring data using only one edge of the clock, HDR-DDR uses both edges.
-
-So, conceptually, if SDR gives us one data-transfer opportunity per clock cycle, HDR-DDR can provide two.
-
-But HDR-DDR is not simply SDR with double the clock frequency.
-
-It has its own protocol, including Preamble bits, Command Words, Data Words, flow-control procedures, CRC, and transfer termination mechanisms.
-
-The Controller first enters HDR-DDR and then sends an HDR-DDR command.
-
-Depending on whether it is a Read or Write operation, the following Data Words are transferred in the appropriate direction.
-
-HDR-DDR also has CRC-based error detection using CRC-5.
-
-Another important feature in the v1.1.1 generation is HDR-DDR Write flow control.
-
-Using the ENDXFER CCC, the Controller can configure a Target to use an ACK/NACK mechanism for HDR-DDR Write commands.
-
-This is useful because otherwise a Target that didn’t support a particular Write command could simply ignore the command and the Controller might still continue sending data.
-
-HDR-DDR also defines procedures for ending transfers.
-
-After a transfer, the Controller can either continue with another HDR transfer using an HDR Restart Pattern or leave HDR mode using an HDR Exit Pattern.
-
-Now, Section 5.2.3 describes HDR-TSP and HDR-TSL.
-
-These are HDR Ternary modes from the full I3C specification.
-
-However, they are not part of I3C Basic, so we don’t need to implement or study them in detail for an I3C Basic implementation.
-
-The last and probably most interesting HDR mode for us is HDR-BT.
-
-HDR-BT stands for HDR Bulk Transport.
-
-The purpose of HDR-BT is high-throughput bulk data transfer.
-
-Unlike HDR-DDR, which mainly improves the rate by using both clock edges, HDR-BT combines high-speed transfer with a Clock-and-Data model and Multi-Lane capability.
-
-HDR-BT can operate using a single data lane, dual data lanes, or quad data lanes.
-
-So conceptually:
-
-Single lane gives us one SDA data lane.
-
-Dual lane gives us two.
-
-And quad lane gives us four.
-
-More lanes mean that more data can be transferred during the same clock period.
-
-HDR-BT organizes the transfer into structured blocks.
-
-At a high level, we have a Header Block, followed by one or more Data Blocks, and then a CRC Block.
-
-A Data Block can contain up to 32 data bytes in the v1.1.1 protocol.
-
-For a large transfer, we can therefore have multiple Data Blocks.
-
-HDR-BT also provides CRC-based error detection, with CRC-16 and CRC-32 mechanisms defined by the protocol.
-
-Another important concept is the Transition information.
-
-HDR-BT uses Transition, Transition_Control, and Transition_Verify information to manage flow control, transfer continuation or termination, and transmitter/receiver handoff.
-
-HDR-BT also has something called Data Block Delay.
-
-Imagine that a Target is performing a Read and has already sent one 32-byte Data Block, but its internal system isn’t ready with the next block yet.
-
-HDR-BT provides a mechanism for the Target to delay the next Data Block.
-
-This should not be confused with normal SDR clock stretching. MIPI specifically clarified this distinction in v1.1.1.
-
-Also, in certain HDR-BT Read situations, the Target can provide the clock. But this is only allowed in the specific protocol-defined situation. It does not mean that a Target can freely drive SCL whenever it wants.
-
-So, if we summarize Section 5.2:
-
-SDR is the normal I3C mode.
-
-HDR Entry provides the transition from SDR into HDR.
-
-HDR-DDR improves data-transfer efficiency by transferring information on both clock edges.
-
-HDR-BT is designed for high-throughput bulk transfers and additionally supports Single, Dual, and Quad Lane configurations.
-
-And HDR-TSP and HDR-TSL are full-I3C features and are not part of I3C Basic.
-
-So the main picture to remember is:
-
-SDR → HDR Entry → HDR-DDR or HDR-BT → HDR Exit or HDR Restart.
-
-That’s the overall structure of Section 5.2.
+@enduml
