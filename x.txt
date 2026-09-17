@@ -1,164 +1,214 @@
 @startuml
-
 ' ============================================================
-' RM DRAM Layout — HCore Carve-out, RM Addition & FW Mapping
+' RM DRAM LAYOUT
+' Compatible with PlantUML 1.2024.8
 ' ============================================================
 
-left to right direction
+scale 1850 width
 
-skinparam backgroundColor white
+skinparam backgroundColor #F8FAFC
 skinparam shadowing false
-skinparam packageStyle rectangle
 skinparam roundcorner 12
+skinparam linetype ortho
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam defaultFontColor #14213D
+
+skinparam ArrowFontName Arial
+skinparam ArrowFontSize 13
+skinparam ArrowColor #17365D
+skinparam ArrowThickness 1.5
 
 skinparam rectangle {
-    BorderColor #234B6B
-    FontColor #172B3A
+    BorderColor #35546B
+    FontColor #14213D
+    BackgroundColor white
+    RoundCorner 12
+}
+
+skinparam note {
+    BackgroundColor #FFF8D6
+    BorderColor #B98A00
+    FontColor #14213D
 }
 
 skinparam package {
-    BorderColor #6B8FA8
-    FontColor #102A43
-    BackgroundColor white
+    BorderThickness 2
+    FontColor #14213D
+    RoundCorner 15
 }
 
-skinparam ArrowColor #183B56
-skinparam ArrowThickness 2
+skinparam nodesep 35
+skinparam ranksep 35
+
 
 ' ============================================================
-' MACROS
+' HEADER
 ' ============================================================
 
-!procedure boxBlue($alias, $text)
-rectangle "$text" as $alias #D9EEF9
-!endprocedure
+rectangle "
+<size:25><color:white><b>RM DRAM Layout — HCore Carve-out, RM Addition & FW Image Mapping</b></color></size>
+<size:16><color:#D9ECFF><b>Carve 64 KB from HCore DRAM  →  Add RM DRAM  →  Insert new FW section (m4)  →  Shift subsequent sections</b></color></size>
+" as HEADER #123F6D
 
-!procedure boxYellow($alias, $text)
-rectangle "$text" as $alias #FFF3C4
-!endprocedure
-
-!procedure boxGreen($alias, $text)
-rectangle "$text" as $alias #CDEFD8
-!endprocedure
-
-!procedure boxRed($alias, $text)
-rectangle "$text" as $alias #F6C5C5
-!endprocedure
-
-!procedure boxPurple($alias, $text)
-rectangle "$text" as $alias #E6D8F5
-!endprocedure
 
 ' ============================================================
 ' PANEL 1
 ' ============================================================
 
-package "PANEL 1\nHCore Memory Layout\n(on-chip DRAM)" as P1 #E8F5FF {
+package "
+<size:19><b>PANEL 1</b></size>
+<size:18><b>HCore Memory Layout</b></size>
+<size:16><b>(on-chip DRAM)</b></size>
+" as PANEL1 #E6F4FF {
 
-    boxBlue(HCORE_ITCM,
-    "HCore ITCM RO\n0x00004000")
+    rectangle "
+<b>HCore ITCM RO</b>
+0x00040000
+" as H_ITCM #D9EEFF
 
-    boxBlue(HCORE_DTCM,
-    "HCore DTCM RW\n0x00061600")
+    rectangle "
+<b>HCore DTCM RW</b>
+0x00061600
+" as H_DTCM #D9EEFF
 
-    boxYellow(HCORE_DRAM_RO,
-    "HCore DRAM RO\n0x01AE0000\n~599 KB code\n~105 KB margin")
+    rectangle "
+<b>HCore DRAM RO</b>
 
-    boxRed(CARVED,
-    "CARVED FOR RM DRAM\n0x01B90000 - 0x01B9FFFF\n64 KB tail")
+0x01AE0000
 
-    boxBlue(HCORE_DRAM_RW,
-    "HCore DRAM RW\n0x01BA0000 - 0x01BAFFFF\n64 KB")
+~599 KB code
+~105 KB margin
+" as H_DRAM_RO #FFF2C7
 
-    note right of HCORE_DRAM_RW
-    This 64 KB tail was previously
-    part of the HCore DRAM RO.
+    rectangle "
+<color:#8B0000><b>CARVED FOR RM DRAM</b></color>
 
-    It is now reused as:
+0x01B90000 - 0x01B9FFFF
 
-    LOAD_RM_DRAM
-    end note
+<b>64 KB tail</b>
+" as H_CARVE #FFB8B8
 
-    HCORE_ITCM -down-> HCORE_DTCM
-    HCORE_DTCM -down-> HCORE_DRAM_RO
-    HCORE_DRAM_RO -down-> CARVED
-    CARVED -down-> HCORE_DRAM_RW
+    rectangle "
+<b>HCore DRAM RW</b>
+
+0x01BA0000 - 0x01BAFFFF
+
+64 KB
+" as H_DRAM_RW #D9EEFF
+
+    note "
+This 64 KB tail was previously
+part of the HCore DRAM RO
+reserved region.
+
+It is now reused as:
+
+<b>LOAD_RM_DRAM</b>
+" as H_NOTE
+
+
+    H_ITCM -down-> H_DTCM
+    H_DTCM -down-> H_DRAM_RO
+    H_DRAM_RO -down-> H_CARVE
+    H_CARVE -down-> H_DRAM_RW
+
+    H_DRAM_RW -[hidden]down-> H_NOTE
 }
+
 
 ' ============================================================
 ' PANEL 2
 ' ============================================================
 
-package "PANEL 2\nRM Memory Layout\n(newly added DRAM)" as P2 #E8FFF8 {
+package "
+<size:19><b>PANEL 2</b></size>
+<size:18><b>RM Memory Layout</b></size>
+<size:16><b>(newly added DRAM)</b></size>
+" as PANEL2 #E6FFF7 {
 
-    boxYellow(RM_OVERFLOW,
-    "RM SRAM — OVERFLOWED\nLOAD_SRAM\n0x01600000\n52 KB")
+    rectangle "
+<b>RM SRAM — OVERFLOWED</b>
 
-    boxGreen(RM_DRAM,
-    "RM DRAM RO — NEW\nLOAD_RM_DRAM\n0x01B90000\n\n0x2C18 = 11,264 B\nMax capacity = 64 KB")
+<b>LOAD_SRAM</b>
 
-    rectangle "Contains:\nBootFlash\nFMC\nTE\nNSP\nUtil\nBootNCP\nBootHIPnand\nSignalIntegrity" as RM_CONTENT #DFF5E7
+0x01600000
 
-    boxPurple(MPU21,
-    "MPU Region 21\nBase = 0x01B90000\nRM_DRAM_ZI\nzero-init before C++ ctors")
+52 KB
+" as RM_SRAM #FFF0B5
 
-    RM_OVERFLOW -down-> RM_DRAM
+
+    rectangle "
+<b>RM DRAM RO — NEW</b>
+
+<b>LOAD_RM_DRAM</b>
+
+0x01B90000
+
+0x2C18 = 11,264 B
+
+Max capacity = 64 KB
+" as RM_DRAM #A9EDB7
+
+
+    rectangle "
+<b>Contents:</b>
+
+BootFlash
+FMC
+TE
+NSP
+Util
+BootNCP
+BootHIPNand
+SignalIntegrity
+" as RM_CONTENT #DFFFF0
+
+
+    rectangle "
+<b>MPU Region 21</b>
+
+Base = 0x01B90000
+
+RM_DRAM_ZI
+
+zero-init before C++ ctors
+" as RM_MPU #E9D9FF
+
+
+    RM_SRAM -down-> RM_DRAM
     RM_DRAM -down-> RM_CONTENT
-    RM_CONTENT -down-> MPU21
+
+    RM_CONTENT -[hidden]down-> RM_MPU
+
+    RM_DRAM -[#1769AA,dashed,thickness=2]down-> RM_MPU :
+    <color:#1769AA><b>MPU Region 21\nprotects RM DRAM</b></color>
 }
+
 
 ' ============================================================
 ' PANEL 3
 ' ============================================================
 
-package "PANEL 3\nFW Image Layout\n(FW_SECTION_IDX enum — mX)" as P3 #FFFDE6 {
+package "
+<size:19><b>PANEL 3</b></size>
+<size:18><b>FW Image Layout</b></size>
+<size:16><b>(FW_SECTION_IDX enum — mX)</b></size>
+" as PANEL3 #FFF8C9 {
 
-    rectangle "Unchanged indices (before insertion)\n\nm0    RM SRAM code\nm1    HCore ITCM RO\nm2    HCore DTCM RW\nm3    HCore DRAM RO" as OLD_IDX #F4F7F9
+    rectangle "
+<b>Unchanged indices (before insertion)</b>
 
-    boxGreen(NEW_SECTION,
-    "NEW SECTION INSERTED\n\nm4   RM DRAM RO\n\nMF_RM_DRAM_RO_SECIDX")
+<b>m0</b>     RM SRAM code
 
-    rectangle "All following indices shift by +1\n\nm5    HCore DRAM RW       (was m4)\nm6    CMCore ITCM RO      (was m5)\nm7    CMCore DTCM RW      (was m6)\nm8    CMCore DRAM RO      (was m7)\nm9    NCore ITCM RO       (was m8)\nm10  NCore DTCM RW       (was m9)\nm11  NCore SRAM RO       (was m10)\nm12  NCore DRAM RO       (was m11)\nm13  NCore DRAM RW       (was m12)\nm14  FCore ITCM RO       (was m13)\nm15  FCore DTCM RW       (was m14)\nm16  FCore SRAM RO       (was m15)\nm17  FCore DRAM RO       (was m16)\nm18  FCore DRAM RW       (was m17)" as SHIFTED #F4F7F9
+<b>m1</b>     HCore ITCM RO
 
-    boxYellow(TOTAL,
-    "NUM_TOTAL_SECTION\n36  →  37")
+<b>m2</b>     HCore DTCM RW
 
-    OLD_IDX -down-> NEW_SECTION
-    NEW_SECTION -down-> SHIFTED
-    SHIFTED -down-> TOTAL
-}
+<b>m3</b>     HCore DRAM RO
+" as FW_OLD #F6F9FC
 
-' ============================================================
-' CROSS-PANEL FLOW
-' ============================================================
 
-HCORE_DRAM_RO -right-> RM_DRAM : 64 KB carved\nfrom HCore and reassigned\nto RM
-
-RM_DRAM -right-> NEW_SECTION : Represented by new\nFW section index
-
-NEW_SECTION ..> RM_DRAM : MF_CORE_DRAM_RO_SECIDX\n        ↓\nMF_RM_DRAM_RO_SECIDX
-
-' ============================================================
-' MPU relationship
-' ============================================================
-
-RM_DRAM ..down..> MPU21 : MPU Region 21\nprotects RM DRAM
-
-' ============================================================
-' INSERTION POINT
-' ============================================================
-
-note right of NEW_SECTION
-Insertion point:
-
-MF_HCORE_DRAM_RO_SECIDX
-        ↓
-MF_RM_DRAM_RO_SECIDX
-        ↓
-remaining sections
-
-Therefore every section after
-HCore DRAM RO moves by +1.
-end note
-
-@enduml
+    rectangle "
+<b
