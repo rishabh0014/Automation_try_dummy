@@ -1,214 +1,79 @@
 @startuml
-' ============================================================
-' RM DRAM LAYOUT
-' Compatible with PlantUML 1.2024.8
-' ============================================================
 
-scale 1850 width
-
-skinparam backgroundColor #F8FAFC
+left to right direction
 skinparam shadowing false
-skinparam roundcorner 12
-skinparam linetype ortho
+skinparam roundcorner 10
 
-skinparam defaultFontName Arial
-skinparam defaultFontSize 14
-skinparam defaultFontColor #14213D
+skinparam packageStyle rectangle
 
-skinparam ArrowFontName Arial
-skinparam ArrowFontSize 13
-skinparam ArrowColor #17365D
-skinparam ArrowThickness 1.5
-
-skinparam rectangle {
-    BorderColor #35546B
-    FontColor #14213D
-    BackgroundColor white
-    RoundCorner 12
-}
-
-skinparam note {
-    BackgroundColor #FFF8D6
-    BorderColor #B98A00
-    FontColor #14213D
-}
-
-skinparam package {
-    BorderThickness 2
-    FontColor #14213D
-    RoundCorner 15
-}
-
-skinparam nodesep 35
-skinparam ranksep 35
-
-
-' ============================================================
-' HEADER
-' ============================================================
-
-rectangle "
-<size:25><color:white><b>RM DRAM Layout — HCore Carve-out, RM Addition & FW Image Mapping</b></color></size>
-<size:16><color:#D9ECFF><b>Carve 64 KB from HCore DRAM  →  Add RM DRAM  →  Insert new FW section (m4)  →  Shift subsequent sections</b></color></size>
-" as HEADER #123F6D
-
-
-' ============================================================
+'========================
 ' PANEL 1
-' ============================================================
+'========================
 
-package "
-<size:19><b>PANEL 1</b></size>
-<size:18><b>HCore Memory Layout</b></size>
-<size:16><b>(on-chip DRAM)</b></size>
-" as PANEL1 #E6F4FF {
+package "PANEL 1\nHCore Memory Layout\n(on-chip DRAM)" as PANEL1 {
 
-    rectangle "
-<b>HCore ITCM RO</b>
-0x00040000
-" as H_ITCM #D9EEFF
+    rectangle "HCore ITCM RO\n0x00004000" as ITCM #D9EEF9
 
-    rectangle "
-<b>HCore DTCM RW</b>
-0x00061600
-" as H_DTCM #D9EEFF
+    rectangle "HCore DTCM RW\n0x00061600" as DTCM #D9EEF9
 
-    rectangle "
-<b>HCore DRAM RO</b>
+    rectangle "HCore DRAM RO\n0x01AE0000\n~599 KB code\n~105 KB margin" as DRAMRO #FFF3C4
 
-0x01AE0000
+    rectangle "CARVED FOR RM DRAM\n0x01B90000 - 0x01B9FFFF\n64 KB tail" as CARVED #F6C5C5
 
-~599 KB code
-~105 KB margin
-" as H_DRAM_RO #FFF2C7
+    rectangle "HCore DRAM RW\n0x01BA0000 - 0x01BAFFFF\n64 KB" as DRAMRW #D9EEF9
 
-    rectangle "
-<color:#8B0000><b>CARVED FOR RM DRAM</b></color>
-
-0x01B90000 - 0x01B9FFFF
-
-<b>64 KB tail</b>
-" as H_CARVE #FFB8B8
-
-    rectangle "
-<b>HCore DRAM RW</b>
-
-0x01BA0000 - 0x01BAFFFF
-
-64 KB
-" as H_DRAM_RW #D9EEFF
-
-    note "
-This 64 KB tail was previously
-part of the HCore DRAM RO
-reserved region.
-
-It is now reused as:
-
-<b>LOAD_RM_DRAM</b>
-" as H_NOTE
-
-
-    H_ITCM -down-> H_DTCM
-    H_DTCM -down-> H_DRAM_RO
-    H_DRAM_RO -down-> H_CARVE
-    H_CARVE -down-> H_DRAM_RW
-
-    H_DRAM_RW -[hidden]down-> H_NOTE
+    ITCM -down-> DTCM
+    DTCM -down-> DRAMRO
+    DRAMRO -down-> CARVED
+    CARVED -down-> DRAMRW
 }
 
-
-' ============================================================
+'========================
 ' PANEL 2
-' ============================================================
+'========================
 
-package "
-<size:19><b>PANEL 2</b></size>
-<size:18><b>RM Memory Layout</b></size>
-<size:16><b>(newly added DRAM)</b></size>
-" as PANEL2 #E6FFF7 {
+package "PANEL 2\nRM Memory Layout\n(newly added DRAM)" as PANEL2 {
 
-    rectangle "
-<b>RM SRAM — OVERFLOWED</b>
+    rectangle "RM SRAM — OVERFLOWED\nLOAD_SRAM\n0x01600000\n52 KB" as RMSRAM #FFF3C4
 
-<b>LOAD_SRAM</b>
+    rectangle "RM DRAM RO — NEW\nLOAD_RM_DRAM\n0x01B90000\n\n0x2C18 = 11,264 B\nMax capacity = 64 KB" as RMDRAM #CDEFD8
 
-0x01600000
+    rectangle "Contains:\nBootFlash\nFMC\nTE\nNSP\nUtil\nBootNCP\nBootHIPnand\nSignalIntegrity" as CONTENT #DFF5E7
 
-52 KB
-" as RM_SRAM #FFF0B5
+    rectangle "MPU Region 21\nBase = 0x01B90000\nRM_DRAM_ZI\nzero-init before C++ ctors" as MPU21 #E6D8F5
 
-
-    rectangle "
-<b>RM DRAM RO — NEW</b>
-
-<b>LOAD_RM_DRAM</b>
-
-0x01B90000
-
-0x2C18 = 11,264 B
-
-Max capacity = 64 KB
-" as RM_DRAM #A9EDB7
-
-
-    rectangle "
-<b>Contents:</b>
-
-BootFlash
-FMC
-TE
-NSP
-Util
-BootNCP
-BootHIPNand
-SignalIntegrity
-" as RM_CONTENT #DFFFF0
-
-
-    rectangle "
-<b>MPU Region 21</b>
-
-Base = 0x01B90000
-
-RM_DRAM_ZI
-
-zero-init before C++ ctors
-" as RM_MPU #E9D9FF
-
-
-    RM_SRAM -down-> RM_DRAM
-    RM_DRAM -down-> RM_CONTENT
-
-    RM_CONTENT -[hidden]down-> RM_MPU
-
-    RM_DRAM -[#1769AA,dashed,thickness=2]down-> RM_MPU :
-    <color:#1769AA><b>MPU Region 21\nprotects RM DRAM</b></color>
+    RMSRAM -down-> RMDRAM
+    RMDRAM -down-> CONTENT
+    CONTENT -down-> MPU21
 }
 
-
-' ============================================================
+'========================
 ' PANEL 3
-' ============================================================
+'========================
 
-package "
-<size:19><b>PANEL 3</b></size>
-<size:18><b>FW Image Layout</b></size>
-<size:16><b>(FW_SECTION_IDX enum — mX)</b></size>
-" as PANEL3 #FFF8C9 {
+package "PANEL 3\nFW Image Layout\n(FW_SECTION_IDX enum — mX)" as PANEL3 {
 
-    rectangle "
-<b>Unchanged indices (before insertion)</b>
+    rectangle "Unchanged indices (before insertion)\n\nm0    RM SRAM code\nm1    HCore ITCM RO\nm2    HCore DTCM RW\nm3    HCore DRAM RO" as OLD #F4F7F9
 
-<b>m0</b>     RM SRAM code
+    rectangle "NEW SECTION INSERTED\n\nm4    RM DRAM RO\n\nMF_RM_DRAM_RO_SECIDX" as NEWSEC #CDEFD8
 
-<b>m1</b>     HCore ITCM RO
+    rectangle "All following indices shift by +1\n\nm5    HCore DRAM RW       (was m4)\nm6    CMCore ITCM RO      (was m5)\nm7    CMCore DTCM RW      (was m6)\nm8    CMCore DRAM RO      (was m7)\nm9    NCore ITCM RO       (was m8)\nm10  NCore DTCM RW       (was m9)\nm11  NCore SRAM RO       (was m10)\nm12  NCore DRAM RO       (was m11)\nm13  NCore DRAM RW       (was m12)\nm14  FCore ITCM RO       (was m13)\nm15  FCore DTCM RW       (was m14)\nm16  FCore SRAM RO       (was m15)\nm17  FCore DRAM RO       (was m16)\nm18  FCore DRAM RW       (was m17)" as SHIFT #F4F7F9
 
-<b>m2</b>     HCore DTCM RW
+    rectangle "NUM_TOTAL_SECTION\n36  →  37" as TOTAL #FFF3C4
 
-<b>m3</b>     HCore DRAM RO
-" as FW_OLD #F6F9FC
+    OLD -down-> NEWSEC
+    NEWSEC -down-> SHIFT
+    SHIFT -down-> TOTAL
+}
 
+'========================
+' CROSS PANEL CONNECTIONS
+'========================
 
-    rectangle "
-<b
+DRAMRO -right-> RMDRAM : 64 KB carved\nfrom HCore and reassigned\nto RM
+
+RMDRAM -right-> NEWSEC : Represented by new\nFW section index
+
+RMDRAM ..down..> MPU21 : MPU Region 21\nprotects RM DRAM
+
+@enduml
